@@ -6,11 +6,25 @@ class BaseRepository:
     def __init__(self, db: AsyncIOMotorDatabase, collection_name: str):
         self.collection = db[collection_name]
 
-    async def find_one(self, query: Dict[str, Any], sort: Optional[List[tuple]] = None) -> Optional[Dict[str, Any]]:
-        return await self.collection.find_one(query, sort=sort)
+    async def find_one(
+        self,
+        query: Dict[str, Any],
+        sort: Optional[List[tuple]] = None,
+        projection: Optional[Dict[str, int]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        return await self.collection.find_one(query, sort=sort, projection=projection)
 
-    async def find_all(self, query: Dict[str, Any] = {}, limit: int = 100) -> List[Dict[str, Any]]:
-        cursor = self.collection.find(query).limit(limit)
+    async def find_all(
+        self,
+        query: Dict[str, Any] = {},
+        limit: int = 100,
+        sort: Optional[List[tuple]] = None,
+        projection: Optional[Dict[str, int]] = None,
+    ) -> List[Dict[str, Any]]:
+        cursor = self.collection.find(query, projection=projection)
+        if sort:
+            cursor = cursor.sort(sort)
+        cursor = cursor.limit(limit)
         return await cursor.to_list(length=limit)
 
     async def create(self, data: Dict[str, Any]) -> str:

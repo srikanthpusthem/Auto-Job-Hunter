@@ -9,8 +9,7 @@ class RunRepository(BaseRepository):
     
     async def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get most recent scan runs"""
-        cursor = self.collection.find({}).sort("started_at", -1).limit(limit)
-        return await cursor.to_list(length=limit)
+        return await self.find_all({}, limit=limit, sort=[("started_at", -1)])
     
     async def get_total_scanned(self) -> int:
         """Get total number of jobs scanned across all completed runs"""
@@ -36,7 +35,8 @@ class RunRepository(BaseRepository):
     
     async def get_last_run(self) -> Optional[Dict[str, Any]]:
         """Get the last run regardless of status"""
-        return await self.find_one({}, sort=[("started_at", -1)])
+        results = await self.find_all({}, limit=1, sort=[("started_at", -1)])
+        return results[0] if results else None
 
 class RunLogRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
@@ -44,8 +44,7 @@ class RunLogRepository(BaseRepository):
     
     async def get_recent_logs(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Get most recent logs for timeline"""
-        cursor = self.collection.find({}).sort("timestamp", -1).limit(limit)
-        return await cursor.to_list(length=limit)
+        return await self.find_all({}, limit=limit, sort=[("timestamp", -1)])
     
     async def add_log(self, step: str, run_id: Optional[str] = None, metadata: Dict[str, Any] = None):
         """Add a log entry"""
