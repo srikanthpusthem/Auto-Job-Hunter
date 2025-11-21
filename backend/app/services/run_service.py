@@ -12,7 +12,7 @@ class RunService:
 
     async def get_status(self) -> Dict[str, Any]:
         # Check history_repo for running scans
-        last_run = await self.history_repo.collection.find_one({}, sort=[("started_at", -1)])
+        last_run = await self.history_repo.find_one({}, sort=[("started_at", -1)])
         
         status = "idle"
         if last_run and last_run.get("status") == "running":
@@ -50,7 +50,7 @@ class RunService:
         # OR update get_status to use history_repo.
         # Let's update get_status to use history_repo too, effectively migrating.
         
-        # Wait, I can't easily update get_status in this same block. 
+        # Wait, I can't easily update get_status in this same block.
         # I'll just use history_repo here and update get_status in a separate call if needed.
         # Actually, I'll replace the run_repo.create call with history_repo.start_scan.
         
@@ -77,7 +77,7 @@ class RunService:
         # But I don't have a "get_last_run" on history_repo yet (only list_scans).
         # I should add it or use find_one.
         
-        last_run = await self.history_repo.collection.find_one({"status": "running"}, sort=[("started_at", -1)])
+        last_run = await self.history_repo.find_one({"status": "running"}, sort=[("started_at", -1)])
         
         if not last_run:
             raise ValueError("No active run to stop")
@@ -112,4 +112,4 @@ class RunService:
         # So we probably just want the last system scan?
         # history_repo.get_last_completed_scan requires user_id.
         # I'll modify it to be optional or just find one.
-        return await self.history_repo.collection.find_one({"status": "completed"}, sort=[("started_at", -1)])
+        return await self.history_repo.find_one({"status": "completed"}, sort=[("started_at", -1)])

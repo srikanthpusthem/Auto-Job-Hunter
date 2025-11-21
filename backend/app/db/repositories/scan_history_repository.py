@@ -32,8 +32,11 @@ class ScanHistoryRepository(BaseRepository):
 
     async def list_scans(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """List recent scans for a user"""
-        cursor = self.collection.find({"user_id": user_id}).sort("started_at", -1).limit(limit)
-        return await cursor.to_list(length=limit)
+        return await self.find_all(
+            {"user_id": user_id},
+            limit=limit,
+            sort=[("started_at", -1)],
+        )
 
     async def get_last_completed_scan(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get the last successfully completed scan for a user"""
