@@ -13,7 +13,8 @@ async def reviewer_node(state: AgentState):
     run_id = state.get("run_id")
     await log_step(user_id, "Reviewer: Finalizing job list...", run_id=run_id)
     matched_jobs = state.get("matched_jobs", [])
-    
+    user_id = state.get("user_id", "")
+
     if not matched_jobs:
         print("No jobs to review.")
         return {"matched_jobs": []}
@@ -25,7 +26,7 @@ async def reviewer_node(state: AgentState):
     final_jobs = []
     for job in matched_jobs:
         # Check for duplicate using fingerprint
-        existing = await repo.find_by_fingerprint(job.metadata.fingerprint)
+        existing = await repo.find_by_fingerprint(job.metadata.fingerprint, user_id)
         if not existing:
             # Save to DB
             await repo.create(job.model_dump(by_alias=True))

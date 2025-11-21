@@ -1,8 +1,10 @@
 import { useAgentTimeline, useAgentStatus } from '../../services/runService'
+import { useUser } from '@clerk/clerk-react'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function AgentTimeline() {
-  const { data: timeline } = useAgentTimeline()
+  const { user } = useUser()
+  const { data: timeline } = useAgentTimeline(user?.id)
   const { data: statusData } = useAgentStatus()
   const isRunning = statusData?.status === 'running'
 

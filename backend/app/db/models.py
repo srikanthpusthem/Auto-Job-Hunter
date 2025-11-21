@@ -90,7 +90,8 @@ class Job(BaseModel):
     match_reasoning: Optional[str] = None
     missing_skills: List[str] = Field(default_factory=list)
     status: JobStatus = JobStatus.NEW
-    
+    user_id: Optional[str] = None
+
     # Outreach
     outreach: OutreachContent = Field(default_factory=OutreachContent)
     

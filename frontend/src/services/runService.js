@@ -6,7 +6,7 @@ export const runKeys = {
   status: () => [...runKeys.all, 'status'],
   nextScan: () => [...runKeys.all, 'next-scan'],
   lastScan: () => [...runKeys.all, 'last-scan'],
-  timeline: () => [...runKeys.all, 'timeline'],
+  timeline: (clerkUserId) => [...runKeys.all, 'timeline', clerkUserId],
 }
 
 export const useAgentStatus = () => {
@@ -40,13 +40,16 @@ export const useLastScan = () => {
   })
 }
 
-export const useAgentTimeline = () => {
+export const useAgentTimeline = (clerkUserId) => {
   return useQuery({
-    queryKey: runKeys.timeline(),
+    queryKey: runKeys.timeline(clerkUserId),
     queryFn: async () => {
-      const { data } = await api.get('/api/runs/timeline')
+      const { data } = await api.get('/api/runs/timeline', {
+        params: { clerk_user_id: clerkUserId }
+      })
       return data
     },
+    enabled: !!clerkUserId,
     refetchInterval: 2000, // Poll every 2 seconds for live updates
   })
 }
@@ -70,10 +73,12 @@ export const useToggleAutoScan = () => {
 
 export const useStartRun = () => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post('/api/runs/start')
+    mutationFn: async (clerkUserId) => {
+      const { data } = await api.post('/api/runs/start', {
+        clerk_user_id: clerkUserId
+      })
       return data
     },
     onSuccess: () => {
@@ -84,10 +89,12 @@ export const useStartRun = () => {
 
 export const useStopRun = () => {
   const queryClient = useQueryClient()
-  
+
   return useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post('/api/runs/stop')
+    mutationFn: async (clerkUserId) => {
+      const { data } = await api.post('/api/runs/stop', {
+        clerk_user_id: clerkUserId
+      })
       return data
     },
     onSuccess: () => {
