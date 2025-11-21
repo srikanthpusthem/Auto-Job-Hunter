@@ -16,6 +16,7 @@ async def main():
                 "location": "Remote",
                 "description": "We are looking for a Python expert with FastAPI experience.",
                 "via": "Google Jobs",
+                "listing_url": "https://example.com/job/1",
                 "detected_extensions": {"posted_at": "1 day ago", "schedule_type": "Full-time"}
             },
             {

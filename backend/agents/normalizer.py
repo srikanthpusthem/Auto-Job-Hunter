@@ -22,7 +22,15 @@ async def normalize_job_batch(raw_jobs: List[Dict[str, Any]], system_prompt_temp
     """
     Use LLM to normalize a batch of jobs, then apply Python validation.
     """
-    system_prompt = system_prompt_template.format(raw_jobs=json.dumps(raw_jobs, indent=2))
+    # Truncate long descriptions to save tokens
+    truncated_jobs = []
+    for job in raw_jobs:
+        job_copy = job.copy()
+        if job_copy.get('description') and len(job_copy['description']) > 500:
+            job_copy['description'] = job_copy['description'][:500] + "..."
+        truncated_jobs.append(job_copy)
+
+    system_prompt = system_prompt_template.format(raw_jobs=json.dumps(truncated_jobs, indent=2))
     
     response = await llm_client.generate_json(
         prompt="Normalize these job listings according to the schema.",
@@ -37,7 +45,7 @@ async def normalize_job_batch(raw_jobs: List[Dict[str, Any]], system_prompt_temp
         return {"normalized_jobs": [], "discarded_count": len(raw_jobs), "discard_reasons": ["llm_parse_error"] * len(raw_jobs)}
 
 
-def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source: str) -> Job:
+def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source: str, scan_run_id: str = None) -> Job:
     """
     Apply Python-level validation and create Job model with metadata.
     """
@@ -69,7 +77,8 @@ def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source
     metadata = JobMetadata(
         fingerprint=fingerprint,
         scraped_from=source,
-        raw_payload=raw_job
+        raw_payload=raw_job,
+        scan_run_id=scan_run_id
     )
     
     # Create Job model
@@ -84,7 +93,7 @@ def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source
         "remote": normalized_job.get('remote', False),
         "job_type": normalized_job.get('job_type'),
         "employment_type": normalized_job.get('employment_type'),
-        "salary": SalaryInfo(**normalized_job.get('salary', {})),
+        "salary": SalaryInfo(**(normalized_job.get('salary') or {})),
         "posted_at": parse_posted_date(normalized_job.get('posted_at')) if normalized_job.get('posted_at') else None,
         "description": normalized_job.get('description'),
         "listing_url": normalized_job.get('listing_url'),
@@ -105,6 +114,8 @@ async def normalizer_node(state: AgentState):
     """
     print("--- Job Normalizer Agent ---")
     raw_jobs = state.get("raw_jobs", [])
+    run_meta = state.get("run_meta", {})
+    scan_run_id = run_meta.get("scan_run_id")
     
     if not raw_jobs:
         print("No raw jobs to normalize.")
@@ -115,8 +126,8 @@ async def normalizer_node(state: AgentState):
     with open(prompt_path, "r") as f:
         system_prompt_template = f.read()
     
-    # Process jobs in batches for efficiency (batch of 10)
-    batch_size = 10
+    # Process jobs in batches for efficiency (batch of 3 to avoid rate limits)
+    batch_size = 3
     all_normalized = []
     total_discarded = 0
     discard_reasons = []
@@ -140,7 +151,7 @@ async def normalizer_node(state: AgentState):
                 elif 'indeed' in source:
                     source = 'indeed'
                 
-                job = finalize_job(normalized_job, raw_job, source)
+                job = finalize_job(normalized_job, raw_job, source, scan_run_id)
                 all_normalized.append(job)
             except Exception as e:
                 print(f"Failed to finalize job: {e}")

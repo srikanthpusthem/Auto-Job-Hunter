@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime, timedelta
 from backend.db.mongo import get_database
-from backend.db.repositories import JobRepository, UserRepository
-from backend.db.models import Job
+from backend.db.repositories import JobRepository, UserRepository, RunRepository
+from backend.db.models import Job, ScanRun
+from uuid import uuid4
 import asyncio
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -12,8 +14,10 @@ class ScanRequest(BaseModel):
     clerk_user_id: str
     sources: Optional[List[str]] = None
     match_threshold: float = 0.7
+    keywords: Optional[List[str]] = None
+    location: Optional[str] = None
 
-async def run_job_scan(user_profile: dict, sources: List[str], match_threshold: float):
+async def run_job_scan(user_profile: dict, sources: List[str], match_threshold: float, keywords: List[str] = None, location: str = None, scan_run_id: str = None, db=None):
     """Background task to run the LangGraph workflow"""
     from backend.agents.supervisor import supervisor_node
     from backend.agents.scout import scout_node
@@ -23,14 +27,29 @@ async def run_job_scan(user_profile: dict, sources: List[str], match_threshold: 
     from backend.agents.outreach import outreach_node
     from backend.agents.reviewer import reviewer_node
     
+    # Build search query from keywords and profile
+    search_keywords = keywords or []
+    if user_profile.get("keywords"):
+        search_keywords.extend(user_profile.get("keywords", []))
+    if user_profile.get("skills") and not keywords:
+        # Use skills as keywords if no keywords provided
+        search_keywords.extend(user_profile.get("skills", []))
+    
+    # Remove duplicates
+    search_keywords = list(set(search_keywords))
+    
     # Initialize state
     state = {
         "user_profile": user_profile,
         "run_meta": {
             "sources_used": sources or ["google_jobs", "yc"],
-            "match_threshold": match_threshold
+            "match_threshold": match_threshold,
+            "scan_run_id": scan_run_id
         },
-        "search_query": {},
+        "search_query": {
+            "keywords": search_keywords,
+            "location": location or user_profile.get("preferences", {}).get("location", "Remote")
+        },
         "raw_jobs": [],
         "normalized_jobs": [],
         "matched_jobs": [],
@@ -61,11 +80,30 @@ async def run_job_scan(user_profile: dict, sources: List[str], match_threshold: 
         rev_result = await reviewer_node(state)
         state.update(rev_result)
         
+        # Update scan run with results
+        if db and scan_run_id:
+            run_repo = RunRepository(db)
+            await run_repo.update(scan_run_id, {
+                "status": "completed",
+                "completed_at": datetime.utcnow(),
+                "jobs_found": len(state.get("raw_jobs", [])),
+                "jobs_matched": len(state.get("matched_jobs", []))
+            })
+        
         print(f"Scan completed. Matched {len(state['matched_jobs'])} jobs.")
         
     except Exception as e:
         print(f"Error during job scan: {e}")
         state["errors"].append(str(e))
+        
+        # Update scan run with error
+        if db and scan_run_id:
+            run_repo = RunRepository(db)
+            await run_repo.update(scan_run_id, {
+                "status": "failed",
+                "completed_at": datetime.utcnow(),
+                "error": str(e)
+            })
 
 @router.post("/scan")
 async def trigger_scan(
@@ -75,6 +113,8 @@ async def trigger_scan(
 ):
     """Trigger a job scan for a user"""
     user_repo = UserRepository(db)
+    run_repo = RunRepository(db)
+    
     user = await user_repo.find_one({"clerk_user_id": request.clerk_user_id})
     
     if not user:
@@ -82,30 +122,110 @@ async def trigger_scan(
     
     user_profile = user.get("profile", {})
     
+    # Create scan run record
+    scan_run_id = str(uuid4())
+    scan_run = {
+        "_id": scan_run_id,
+        "status": "running",
+        "sources": request.sources or ["google_jobs", "yc"],
+        "jobs_found": 0,
+        "jobs_matched": 0,
+        "started_at": datetime.utcnow(),
+        "clerk_user_id": request.clerk_user_id
+    }
+    await run_repo.create(scan_run)
+    
     # Add background task
     background_tasks.add_task(
         run_job_scan,
         user_profile,
         request.sources,
-        request.match_threshold
+        request.match_threshold,
+        request.keywords,
+        request.location,
+        scan_run_id,
+        db
     )
     
-    return {"message": "Job scan started", "status": "processing"}
+    return {"message": "Job scan started", "status": "processing", "scan_run_id": scan_run_id}
 
 @router.get("")
 async def list_jobs(
     clerk_user_id: str,
     limit: int = 50,
+    status: Optional[str] = None,
+    scan_run_id: Optional[str] = None,
+    date_from: Optional[str] = None,  # ISO date string
+    date_to: Optional[str] = None,  # ISO date string
+    source: Optional[str] = None,
+    min_match_score: Optional[float] = None,
+    sort_by: Optional[str] = "created_at",  # created_at, posted_at, match_score
+    sort_order: Optional[str] = "desc",  # asc, desc
     db = Depends(get_database)
 ):
-    """List matched jobs for a user"""
+    """List matched jobs for a user with filtering and sorting"""
     job_repo = JobRepository(db)
     
-    # In a real implementation, we'd filter by user_id
-    # For now, return all jobs
-    jobs = await job_repo.find_all(limit=limit)
+    # Build query
+    query = {}
     
-    return {"jobs": jobs, "total": len(jobs)}
+    if status:
+        query["status"] = status
+    
+    if scan_run_id:
+        query["metadata.scan_run_id"] = scan_run_id
+    
+    if source:
+        query["source"] = source
+    
+    if min_match_score is not None:
+        query["match_score"] = {"$gte": min_match_score}
+    
+    # Date filtering
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            try:
+                date_from_dt = datetime.fromisoformat(date_from.replace('Z', '+00:00'))
+                date_query["$gte"] = date_from_dt
+            except:
+                pass
+        if date_to:
+            try:
+                date_to_dt = datetime.fromisoformat(date_to.replace('Z', '+00:00'))
+                date_to_dt = date_to_dt.replace(hour=23, minute=59, second=59)
+                date_query["$lte"] = date_to_dt
+            except:
+                pass
+        if date_query:
+            query["posted_at"] = date_query
+    
+    # Get jobs
+    jobs = await job_repo.find_all(query, limit=limit)
+    
+    # Convert to dicts if needed
+    if jobs and isinstance(jobs[0], dict):
+        jobs = jobs
+    else:
+        jobs = [job.model_dump(by_alias=True) if hasattr(job, 'model_dump') else job for job in jobs]
+    
+    # Sort jobs
+    if sort_by == "posted_at":
+        jobs.sort(key=lambda x: x.get("posted_at") or datetime.min, reverse=(sort_order == "desc"))
+    elif sort_by == "match_score":
+        jobs.sort(key=lambda x: x.get("match_score") or 0, reverse=(sort_order == "desc"))
+    elif sort_by == "created_at":
+        jobs.sort(key=lambda x: x.get("created_at") or x.get("metadata", {}).get("collected_at") or datetime.min, reverse=(sort_order == "desc"))
+    
+    # Get scan runs for grouping
+    run_repo = RunRepository(db)
+    recent_runs = await run_repo.get_recent_runs(limit=20)
+    
+    return {
+        "jobs": jobs,
+        "total": len(jobs),
+        "scan_runs": recent_runs
+    }
 
 @router.get("/{job_id}")
 async def get_job(

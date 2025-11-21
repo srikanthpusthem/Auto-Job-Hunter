@@ -14,19 +14,20 @@ async def reviewer_node(state: AgentState):
         print("No jobs to review.")
         return {"matched_jobs": []}
     
-    # Simple deduplication logic (check if job ID already exists in DB)
+    # Deduplication using fingerprint (more reliable than ID)
     db = await get_database()
     repo = JobRepository(db)
     
     final_jobs = []
     for job in matched_jobs:
-        existing = await repo.find_one({"_id": job.id})
+        # Check for duplicate using fingerprint
+        existing = await repo.find_by_fingerprint(job.metadata.fingerprint)
         if not existing:
             # Save to DB
             await repo.create(job.model_dump(by_alias=True))
             final_jobs.append(job)
         else:
-            print(f"Duplicate job found: {job.id}")
+            print(f"Duplicate job found by fingerprint: {job.metadata.fingerprint} (job: {job.title} at {job.company})")
             
     print(f"Reviewer approved and saved {len(final_jobs)} new jobs.")
     

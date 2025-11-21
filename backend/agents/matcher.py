@@ -6,9 +6,15 @@ from backend.agents.llm_client import llm_client
 from backend.db.models import Job, JobStatus
 
 async def match_job(job: Job, user_profile: dict, system_prompt_template: str) -> Job:
+    # Include keywords in user profile for matching
+    profile_with_keywords = user_profile.copy()
+    if "keywords" not in profile_with_keywords or not profile_with_keywords.get("keywords"):
+        # If no keywords in profile, use skills as keywords
+        profile_with_keywords["keywords"] = user_profile.get("skills", [])
+    
     system_prompt = system_prompt_template.format(
-        user_profile=json.dumps(user_profile, indent=2),
-        job_details=job.model_dump_json(include={"title", "company", "description", "remote", "location", "skills_extracted"})
+        user_profile=json.dumps(profile_with_keywords, indent=2),
+        job_details=job.model_dump_json(include={"title", "company", "description", "remote", "location", "skills_extracted", "tags"})
     )
     
     response = await llm_client.generate_json(

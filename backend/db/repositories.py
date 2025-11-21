@@ -50,7 +50,100 @@ class JobRepository(BaseRepository):
     async def get_matched_jobs(self, limit: int = 50) -> List[Job]:
         data = await self.find_all({}, limit=limit)  # Return all jobs, not just matched
         return [Job(**item) for item in data]
+    
+    async def count_by_status(self, status: str) -> int:
+        """Count jobs by status"""
+        count = await self.collection.count_documents({"status": status})
+        return count
+    
+    async def get_recent_jobs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get most recently matched jobs"""
+        cursor = self.collection.find({}).sort("created_at", -1).limit(limit)
+        return await cursor.to_list(length=limit)
+    
+    async def get_match_score_stats(self) -> Dict[str, Any]:
+        """Get average match score and distribution"""
+        pipeline = [
+            {
+                "$match": {
+                    "match_score": {"$exists": True, "$ne": None}
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "average": {"$avg": "$match_score"},
+                    "count": {"$sum": 1},
+                    "high_match_count": {
+                        "$sum": {"$cond": [{"$gte": ["$match_score", 0.8]}, 1, 0]}
+                    }
+                }
+            }
+        ]
+        result = await self.collection.aggregate(pipeline).to_list(length=1)
+        if result:
+            return {
+                "average": result[0].get("average", 0.0),
+                "count": result[0].get("count", 0),
+                "high_match_count": result[0].get("high_match_count", 0)
+            }
+        return {"average": 0.0, "count": 0, "high_match_count": 0}
+    
+    async def count_by_source(self) -> List[Dict[str, Any]]:
+        """Count jobs grouped by source"""
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$source",
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"count": -1}
+            }
+        ]
+        results = await self.collection.aggregate(pipeline).to_list(length=10)
+        return [{"source": r["_id"], "count": r["count"]} for r in results]
+    
+    async def get_status_breakdown(self) -> Dict[str, int]:
+        """Get count of jobs by each status"""
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$status",
+                    "count": {"$sum": 1}
+                }
+            }
+        ]
+        results = await self.collection.aggregate(pipeline).to_list(length=10)
+        breakdown = {}
+        for r in results:
+            breakdown[r["_id"]] = r["count"]
+        return breakdown
 
 class RunRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
         super().__init__(db, "scan_runs")
+    
+    async def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get most recent scan runs"""
+        cursor = self.collection.find({}).sort("started_at", -1).limit(limit)
+        return await cursor.to_list(length=limit)
+    
+    async def get_total_scanned(self) -> int:
+        """Get total number of jobs scanned across all completed runs"""
+        pipeline = [
+            {
+                "$match": {"status": "completed"}
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "total": {"$sum": "$jobs_found"}
+                }
+            }
+        ]
+        result = await self.collection.aggregate(pipeline).to_list(length=1)
+        if result:
+            return result[0].get("total", 0)
+        return 0

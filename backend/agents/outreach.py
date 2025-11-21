@@ -3,7 +3,7 @@ import os
 import asyncio
 from backend.agents.graph import AgentState
 from backend.agents.llm_client import llm_client
-from backend.db.models import Job
+from backend.db.models import Job, OutreachContent
 
 async def generate_outreach(job: Job, user_profile: dict, system_prompt_template: str) -> dict:
     system_prompt = system_prompt_template.format(
@@ -18,15 +18,18 @@ async def generate_outreach(job: Job, user_profile: dict, system_prompt_template
     
     try:
         data = json.loads(response)
-        job.outreach_email_subject = data.get("email_subject")
-        job.outreach_email_body = data.get("email_body")
-        job.outreach_linkedin_dm = data.get("linkedin_dm")
+        # Update nested outreach content
+        job.outreach = OutreachContent(
+            email_subject=data.get("email_subject"),
+            email_body=data.get("email_body"),
+            linkedin_dm=data.get("linkedin_dm")
+        )
         
         return {
             "job_id": job.id,
-            "email_subject": job.outreach_email_subject,
-            "email_body": job.outreach_email_body,
-            "linkedin_dm": job.outreach_linkedin_dm
+            "email_subject": job.outreach.email_subject,
+            "email_body": job.outreach.email_body,
+            "linkedin_dm": job.outreach.linkedin_dm
         }
     except Exception as e:
         print(f"Error generating outreach for job {job.id}: {e}")

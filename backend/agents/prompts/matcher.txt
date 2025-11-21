@@ -7,12 +7,23 @@ User Profile:
 Job Details:
 {job_details}
 
-Evaluate the match based on skills, experience, and preferences.
+Evaluate the match based on:
+1. Skills match (user skills vs job required skills)
+2. Keywords match (user keywords vs job title/description/tags) - IMPORTANT: Give higher weight to keyword matches
+3. Experience level match
+4. Location/remote preferences
+5. Job type and employment type preferences
+
+KEYWORD MATCHING:
+- If user has keywords like "Python developer", "remote work", "startup" and these appear in the job, boost the match score significantly
+- Keywords are user's search intent and should be weighted heavily
+
 Provide a match score between 0.0 and 1.0.
-Provide a brief reasoning for the score.
+Provide a brief reasoning for the score, mentioning keyword matches if any.
 
 Output a JSON object:
 {{
   "match_score": 0.85,
-  "match_reasoning": "Strong match for Python and FastAPI skills. Remote preference matches."
+  "match_reasoning": "Strong match for Python and FastAPI skills. Keywords 'Python developer' and 'remote work' found in job. Remote preference matches.",
+  "missing_skills": ["Docker", "Kubernetes"]
 }}

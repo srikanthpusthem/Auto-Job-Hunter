@@ -6,8 +6,13 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Auto-Job-Hunter"
     API_V1_STR: str = "/api/v1"
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"]
+    # CORS - Specific origins (regex pattern in main.py handles local network IPs)
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000",
+        "http://192.168.1.211:5173",  # Your network IP
+    ]
 
     # Database
     MONGODB_URL: str = "mongodb://localhost:27017"

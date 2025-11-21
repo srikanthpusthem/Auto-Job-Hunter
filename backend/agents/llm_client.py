@@ -1,4 +1,5 @@
 import os
+import asyncio
 from groq import AsyncGroq
 from backend.core.config import settings
 
@@ -7,9 +8,30 @@ class LLMClient:
         self.client = AsyncGroq(api_key=settings.GROQ_API_KEY)
         self.model = "llama-3.3-70b-versatile"  # Default model
 
+    async def _retry_on_rate_limit(self, func, *args, **kwargs):
+        max_retries = 5
+        base_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "rate_limit_exceeded" in error_msg or "429" in error_msg:
+                    if attempt == max_retries - 1:
+                        print(f"Max retries reached for rate limit: {e}")
+                        raise e
+                    
+                    delay = base_delay * (2 ** attempt)
+                    print(f"Rate limit hit. Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                else:
+                    raise e
+
     async def generate(self, prompt: str, system_message: str = "You are a helpful assistant.") -> str:
         try:
-            chat_completion = await self.client.chat.completions.create(
+            chat_completion = await self._retry_on_rate_limit(
+                self.client.chat.completions.create,
                 messages=[
                     {
                         "role": "system",
@@ -29,7 +51,8 @@ class LLMClient:
 
     async def generate_json(self, prompt: str, system_message: str = "You are a helpful assistant.") -> str:
         try:
-            chat_completion = await self.client.chat.completions.create(
+            chat_completion = await self._retry_on_rate_limit(
+                self.client.chat.completions.create,
                 messages=[
                     {
                         "role": "system",

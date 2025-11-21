@@ -87,7 +87,7 @@ async def run_full_flow():
     for job in state['matched_jobs']:
         print(f"Title: {job.title}")
         print(f"Score: {job.match_score}")
-        print(f"Subject: {job.outreach_email_subject}")
+        print(f"Subject: {job.outreach.email_subject}")
         print("-" * 20)
         
     db.close()

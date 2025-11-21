@@ -14,10 +14,16 @@ class JobStatus(str, Enum):
 class UserProfile(BaseModel):
     name: str
     skills: List[str] = []
+    keywords: List[str] = []  # Search keywords for job matching
     experience_years: int = 0
     resume_text: Optional[str] = None
+    resume_file_url: Optional[str] = None  # URL/path to uploaded resume file
+    resume_parsed_text: Optional[str] = None  # Extracted text from resume
     linkedin_url: Optional[str] = None
-    preferences: Dict[str, Any] = {}
+    summary: Optional[str] = None  # Professional summary/bio
+    education: List[Dict[str, Any]] = []  # Education history
+    work_experience: List[Dict[str, Any]] = []  # Work experience details
+    preferences: Dict[str, Any] = {}  # Location, remote, job_types, employment_types, salary
 
 class User(BaseModel):
     id: str = Field(alias="_id")
@@ -44,6 +50,7 @@ class JobMetadata(BaseModel):
     scraped_from: Optional[str] = None
     fingerprint: str  # hash(title + company + source_id + location)
     raw_payload: Dict[str, Any] = Field(default_factory=dict)
+    scan_run_id: Optional[str] = None  # ID of the scan run that found this job
 
 class Job(BaseModel):
     """
