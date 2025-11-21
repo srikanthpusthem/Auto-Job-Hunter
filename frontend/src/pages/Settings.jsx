@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/clerk-react'
 import { Save, Loader2, CheckCircle } from 'lucide-react'
 import { userApi } from '../lib/api'
@@ -21,19 +21,13 @@ export default function Settings() {
     outreach_style: 'neutral',
   })
 
-  useEffect(() => {
-    if (user?.id) {
-      loadSettings()
-    }
-  }, [user])
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     if (!user?.id) return
     setLoading(true)
     try {
       const data = await userApi.getProfile(user.id)
       setProfile(data)
-      
+
       if (data.profile) {
         const prefs = data.profile.preferences || {}
         setSettings({
@@ -52,7 +46,11 @@ export default function Settings() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    loadSettings()
+  }, [loadSettings])
 
   const handleSave = async () => {
     if (!user?.id || !profile) return
@@ -60,21 +58,6 @@ export default function Settings() {
     setSaving(true)
     setSaved(false)
     try {
-      const updatedProfile = {
-        ...profile.profile,
-        preferences: {
-          ...profile.profile.preferences,
-          aggressiveness: settings.aggressiveness,
-          role_focus: settings.role_focus,
-          remote_only: settings.remote_only,
-          exclude_faang: settings.exclude_faang,
-          target_startups: settings.target_startups,
-          salary_min: settings.salary_min ? parseFloat(settings.salary_min) : null,
-          run_schedule: settings.run_schedule,
-          outreach_style: settings.outreach_style,
-        }
-      }
-
       await userApi.createOrUpdateProfile({
         clerk_user_id: user.id,
         name: profile.profile.name || user.fullName || 'User',

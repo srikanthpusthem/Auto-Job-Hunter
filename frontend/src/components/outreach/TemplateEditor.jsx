@@ -1,24 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X, Save, Loader2, Info } from 'lucide-react'
 
 export default function TemplateEditor({ template, onSave, onCancel, saving }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'initial',
-    subject: '',
-    body: ''
-  })
-
-  useEffect(() => {
-    if (template) {
-      setFormData({
-        name: template.name || '',
-        type: template.type || 'initial',
-        subject: template.subject || '',
-        body: template.body || ''
-      })
-    }
-  }, [template])
+  const [formData, setFormData] = useState(() => ({
+    name: template?.name || '',
+    type: template?.type || 'initial',
+    subject: template?.subject || '',
+    body: template?.body || ''
+  }))
 
   const handleSubmit = (e) => {
     e.preventDefault()

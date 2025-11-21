@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/clerk-react'
 import { Plus, Loader2, MessageSquare, Sparkles } from 'lucide-react'
 import { outreachApi } from '../lib/api'
@@ -13,13 +13,9 @@ export default function Outreach() {
   const [currentTemplate, setCurrentTemplate] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (user?.id) {
-      loadTemplates()
-    }
-  }, [user])
+  const loadTemplates = useCallback(async () => {
+    if (!user?.id) return
 
-  const loadTemplates = async () => {
     try {
       const data = await outreachApi.getTemplates(user.id)
       setTemplates(data)
@@ -28,7 +24,11 @@ export default function Outreach() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    loadTemplates()
+  }, [loadTemplates])
 
   const handleCreate = () => {
     setCurrentTemplate(null)
@@ -136,6 +136,7 @@ export default function Outreach() {
       {/* Main Content */}
       {isEditing ? (
         <TemplateEditor
+          key={currentTemplate?._id || 'new'}
           template={currentTemplate}
           onSave={handleSave}
           onCancel={() => {
