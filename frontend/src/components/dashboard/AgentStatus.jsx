@@ -30,11 +30,15 @@ export default function AgentStatus() {
   }
 
   const handleStart = () => {
-    startRun()
+    if (user?.id) {
+      startRun(user.id)
+    }
   }
 
   const handleStop = () => {
-    stopRun()
+    if (user?.id) {
+      stopRun(user.id)
+    }
   }
 
   return (
