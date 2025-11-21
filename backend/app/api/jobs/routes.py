@@ -32,7 +32,7 @@ async def trigger_scan(
     user_profile = user.get("profile", {})
     
     try:
-        scan_run_id = await run_service.start_run(request.clerk_user_id, request.sources)
+        scan_run_id = await run_service.start_run(user["_id"], request.sources)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     

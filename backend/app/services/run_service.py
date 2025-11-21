@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
+from backend.app.db.repositories.run_repository import RunRepository
 from backend.app.db.repositories.timeline_repository import TimelineRepository
 from backend.app.db.repositories.scan_history_repository import ScanHistoryRepository
 
@@ -27,60 +28,41 @@ class RunService:
 
         return {"status": status}
 
-    async def start_run(self, clerk_user_id: str, sources: List[str] = None) -> str:
-        last_run = await self.history_repo.get_last_run()
+    async def start_run(self, user_id: str, sources: List[str] = None) -> str:
+        if not user_id:
+            raise ValueError("user_id is required to start a run")
+
+        # Check if already running for this user
+        last_run = await self.history_repo.collection.find_one(
+            {"user_id": user_id}, sort=[("started_at", -1)]
+        )
         if last_run and last_run.get("status") == "running":
             started_at = last_run.get("started_at")
             if started_at and (datetime.utcnow() - started_at).total_seconds() < 3600:
                 raise ValueError("Agent is already running")
 
+            # Mark stale run as failed
             await self.history_repo.update(
-                last_run["_id"],
-                {"status": "failed", "error": "Run timed out (stale)"},
+                last_run["_id"], {"status": "failed", "error": "Run timed out (stale)"}
             )
 
-        run_id = await self.history_repo.start_scan(clerk_user_id, sources)
-        
-        # Also create in old run_repo for backward compatibility if needed, 
-        # but user asked to "Create collection: scan_history".
-        # If we switch entirely, we might break things relying on scan_runs.
-        # However, the instruction "Update agent_orchestrator... where scan runs start" implies we should use the new one.
-        # I will assume we are migrating to scan_history as the primary source.
-        # But to be safe and avoid breaking "get_status" which uses run_repo (scan_runs), I should probably keep using run_repo for "active" status 
-        # OR update get_status to use history_repo.
-        # Let's update get_status to use history_repo too, effectively migrating.
-        
-        # Wait, I can't easily update get_status in this same block.
-        # I'll just use history_repo here and update get_status in a separate call if needed.
-        # Actually, I'll replace the run_repo.create call with history_repo.start_scan.
-        
-        # Add initial log
-        # TODO: Get real user_id. For now using clerk_user_id as proxy if it's a valid mongo ID, else we need to fetch user.
-        # Assuming clerk_user_id passed here is actually the mongo ID for now, or we need to look it up.
-        # Given the route passes "manual_trigger", we might have an issue. 
-        # But let's just log it.
-        await self.timeline_repo.add_step(clerk_user_id, "Agent started manually", run_id=run_id)
-        await self.timeline_repo.add_step(
-            clerk_user_id, "Initializing search parameters...", run_id=run_id
-        )
+        # Create new run
+        run_id = await self.history_repo.start_scan(user_id, sources)
 
+        # Add initial log
+        await self.timeline_repo.add_step(user_id, "Agent started manually", run_id=run_id)
+        await self.timeline_repo.add_step(user_id, "Initializing search parameters...", run_id=run_id)
+        
         return run_id
 
-    async def stop_run(self):
-        # We need to find the running scan. run_repo was used before.
-        # Now we should use history_repo.
-        # But wait, get_last_run uses run_repo. I need to update that too.
-        # For now, let's assume we are transitioning.
-        
-        # I need to update get_status and get_last_run to use history_repo to make this consistent.
-        # But first let's fix stop_run.
-        
-        # Since I changed start_run to use history_repo, I must use history_repo here.
-        # But I don't have a "get_last_run" on history_repo yet (only list_scans).
-        # I should add it or use find_one.
-        
-        last_run = await self.history_repo.find_one({"status": "running"}, sort=[("started_at", -1)])
-        
+    async def stop_run(self, user_id: str):
+        if not user_id:
+            raise ValueError("user_id is required to stop a run")
+
+        last_run = await self.history_repo.collection.find_one(
+            {"user_id": user_id, "status": "running"}, sort=[("started_at", -1)]
+        )
+
         if not last_run:
             raise ValueError("No active run to stop")
 
@@ -92,17 +74,13 @@ class RunService:
                 "jobs_matched": last_run.get("jobs_matched", 0),
                 "avg_score": last_run.get("avg_score", 0),
             },
-            status="failed",
         )
 
-        user_id = last_run.get("user_id", "system")
-        await self.timeline_repo.add_step(
-            user_id, "Agent stopped by user", run_id=last_run["_id"]
-        )
+        await self.timeline_repo.add_step(user_id, "Agent stopped by user", run_id=last_run["_id"])
 
-    async def get_timeline(self, limit: int = 50) -> List[Dict[str, Any]]:
-        logs = await self.timeline_repo.get_recent_logs(limit=limit)
-
+    async def get_timeline(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        logs = await self.timeline_repo.get_recent_logs(user_id=user_id, limit=limit)
+        
         timeline = []
         for log in logs:
             timeline.append(

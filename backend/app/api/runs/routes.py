@@ -48,27 +48,49 @@ async def toggle_auto_scan(
     return {"auto_scan_enabled": enabled}
 
 @router.post("/start")
-async def start_run(db = Depends(get_database)):
+async def start_run(
+    clerk_user_id: str = Body(..., embed=True),
+    db = Depends(get_database)
+):
+    user_service = UserService(db)
+    user = await user_service.get_user_by_clerk_id(clerk_user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     run_service = RunService(db)
     try:
-        # TODO: Get clerk_user_id from context/auth
-        # For now, using a placeholder or default if not available in request
-        # Ideally this comes from auth middleware
-        run_id = await run_service.start_run("manual_trigger") 
+        run_id = await run_service.start_run(user["_id"])
         return {"run_id": run_id, "status": "running"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/stop")
-async def stop_run(db = Depends(get_database)):
+async def stop_run(
+    clerk_user_id: str = Body(..., embed=True),
+    db = Depends(get_database)
+):
+    user_service = UserService(db)
+    user = await user_service.get_user_by_clerk_id(clerk_user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     run_service = RunService(db)
     try:
-        await run_service.stop_run()
+        await run_service.stop_run(user["_id"])
         return {"status": "stopped"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/timeline")
-async def get_timeline(limit: int = 50, db = Depends(get_database)):
+async def get_timeline(
+    clerk_user_id: str,
+    limit: int = 50,
+    db = Depends(get_database)
+):
+    user_service = UserService(db)
+    user = await user_service.get_user_by_clerk_id(clerk_user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     run_service = RunService(db)
-    return await run_service.get_timeline(limit)
+    return await run_service.get_timeline(user_id=user["_id"], limit=limit)
