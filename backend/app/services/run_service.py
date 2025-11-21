@@ -7,6 +7,7 @@ from backend.app.db.repositories.scan_history_repository import ScanHistoryRepos
 
 class RunService:
     def __init__(self, db):
+        self.run_repo = RunRepository(db)
         self.timeline_repo = TimelineRepository(db)
         self.history_repo = ScanHistoryRepository(db)
 
