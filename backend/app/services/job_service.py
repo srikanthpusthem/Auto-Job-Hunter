@@ -1,14 +1,14 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from backend.app.db.repositories.job_repository import JobRepository
-from backend.app.db.repositories.run_repository import RunRepository
+from backend.app.db.repositories.scan_history_repository import ScanHistoryRepository
 from backend.app.db.models import Job
 
 class JobService:
     def __init__(self, db):
         self.db = db
         self.job_repo = JobRepository(db)
-        self.run_repo = RunRepository(db)
+        self.run_repo = ScanHistoryRepository(db)
 
     async def run_job_scan(self, user_profile: dict, sources: List[str], match_threshold: float, keywords: List[str] = None, location: str = None, scan_run_id: str = None):
         """Background task to run the LangGraph workflow"""
@@ -76,12 +76,13 @@ class JobService:
             
             # Update scan run with results
             if self.db and scan_run_id:
-                await self.run_repo.update(scan_run_id, {
-                    "status": "completed",
-                    "completed_at": datetime.utcnow(),
-                    "jobs_found": len(state.get("raw_jobs", [])),
-                    "jobs_matched": len(state.get("matched_jobs", []))
-                })
+                await self.run_repo.end_scan(
+                    scan_run_id,
+                    {
+                        "jobs_found": len(state.get("raw_jobs", [])),
+                        "jobs_matched": len(state.get("matched_jobs", [])),
+                    },
+                )
             
             print(f"Scan completed. Matched {len(state['matched_jobs'])} jobs.")
             
@@ -91,11 +92,15 @@ class JobService:
             
             # Update scan run with error
             if self.db and scan_run_id:
-                await self.run_repo.update(scan_run_id, {
-                    "status": "failed",
-                    "completed_at": datetime.utcnow(),
-                    "error": str(e)
-                })
+                await self.run_repo.end_scan(
+                    scan_run_id,
+                    {
+                        "error": str(e),
+                        "jobs_found": len(state.get("raw_jobs", [])),
+                        "jobs_matched": len(state.get("matched_jobs", [])),
+                    },
+                    status="failed",
+                )
 
     async def list_jobs(self, filters: Dict[str, Any], limit: int = 50, sort_by: str = "created_at", sort_order: str = "desc"):
         """List matched jobs with filtering and sorting"""
