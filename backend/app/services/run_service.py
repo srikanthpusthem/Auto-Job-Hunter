@@ -26,7 +26,7 @@ class RunService:
         
         return {"status": status}
 
-    async def start_run(self, clerk_user_id: str, sources: List[str] = None) -> str:
+    async def start_run(self, user_id: str, sources: List[str] = None) -> str:
         # Check if already running
         last_run = await self.run_repo.get_last_run()
         if last_run and last_run.get("status") == "running":
@@ -39,7 +39,7 @@ class RunService:
         
         # Create new run
         # Using ScanHistoryRepository to track this run
-        run_id = await self.history_repo.start_scan(clerk_user_id, sources)
+        run_id = await self.history_repo.start_scan(user_id, sources)
         
         # Also create in old run_repo for backward compatibility if needed, 
         # but user asked to "Create collection: scan_history".
@@ -59,9 +59,9 @@ class RunService:
         # Assuming clerk_user_id passed here is actually the mongo ID for now, or we need to look it up.
         # Given the route passes "manual_trigger", we might have an issue. 
         # But let's just log it.
-        await self.timeline_repo.add_step(clerk_user_id, "Agent started manually", run_id=run_id)
-        await self.timeline_repo.add_step(clerk_user_id, "Initializing search parameters...", run_id=run_id)
-        
+        await self.timeline_repo.add_step(user_id, "Agent started manually", run_id=run_id)
+        await self.timeline_repo.add_step(user_id, "Initializing search parameters...", run_id=run_id)
+
         return run_id
 
     async def stop_run(self):

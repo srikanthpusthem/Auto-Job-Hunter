@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from backend.app.db.repositories.job_repository import JobRepository
 from backend.app.db.repositories.run_repository import RunRepository
+from backend.app.db.repositories.scan_history_repository import ScanHistoryRepository
 from backend.app.db.models import Job
 
 class JobService:
@@ -9,8 +10,9 @@ class JobService:
         self.db = db
         self.job_repo = JobRepository(db)
         self.run_repo = RunRepository(db)
+        self.history_repo = ScanHistoryRepository(db)
 
-    async def run_job_scan(self, user_profile: dict, sources: List[str], match_threshold: float, keywords: List[str] = None, location: str = None, scan_run_id: str = None):
+    async def run_job_scan(self, user_id: str, user_profile: dict, sources: List[str], match_threshold: float, keywords: List[str] = None, location: str = None, scan_run_id: str = None):
         """Background task to run the LangGraph workflow"""
         # Import agents from new location
         from backend.app.agents.supervisor import supervisor_node
@@ -34,6 +36,8 @@ class JobService:
         
         # Initialize state
         state = {
+            "user_id": user_id,
+            "run_id": scan_run_id,
             "user_profile": user_profile,
             "run_meta": {
                 "sources_used": sources or ["google_jobs", "yc"],
@@ -55,6 +59,8 @@ class JobService:
             # Run workflow
             sup_result = await supervisor_node(state)
             state.update(sup_result)
+            if "run_meta" in state:
+                state["run_meta"]["scan_run_id"] = state["run_meta"].get("scan_run_id") or scan_run_id
             
             scout_result = await scout_node(state)
             state.update(scout_result)
@@ -76,12 +82,14 @@ class JobService:
             
             # Update scan run with results
             if self.db and scan_run_id:
-                await self.run_repo.update(scan_run_id, {
+                update_data = {
                     "status": "completed",
                     "completed_at": datetime.utcnow(),
                     "jobs_found": len(state.get("raw_jobs", [])),
                     "jobs_matched": len(state.get("matched_jobs", []))
-                })
+                }
+                await self.run_repo.update(scan_run_id, update_data)
+                await self.history_repo.update(scan_run_id, update_data)
             
             print(f"Scan completed. Matched {len(state['matched_jobs'])} jobs.")
             
@@ -91,15 +99,17 @@ class JobService:
             
             # Update scan run with error
             if self.db and scan_run_id:
-                await self.run_repo.update(scan_run_id, {
+                update_data = {
                     "status": "failed",
                     "completed_at": datetime.utcnow(),
                     "error": str(e)
-                })
+                }
+                await self.run_repo.update(scan_run_id, update_data)
+                await self.history_repo.update(scan_run_id, update_data)
 
-    async def list_jobs(self, filters: Dict[str, Any], limit: int = 50, sort_by: str = "created_at", sort_order: str = "desc"):
+    async def list_jobs(self, user_id: str, filters: Dict[str, Any], limit: int = 50, sort_by: str = "created_at", sort_order: str = "desc"):
         """List matched jobs with filtering and sorting"""
-        query = {}
+        query = {"user_id": user_id}
         
         if filters.get("status"):
             query["status"] = filters["status"]

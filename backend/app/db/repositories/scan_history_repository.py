@@ -35,6 +35,22 @@ class ScanHistoryRepository(BaseRepository):
         cursor = self.collection.find({"user_id": user_id}).sort("started_at", -1).limit(limit)
         return await cursor.to_list(length=limit)
 
+    async def get_total_scanned(self, user_id: str) -> int:
+        """Get total number of jobs scanned for a user"""
+        pipeline = [
+            {"$match": {"user_id": user_id, "status": "completed"}},
+            {
+                "$group": {
+                    "_id": None,
+                    "total": {"$sum": "$jobs_found"}
+                }
+            }
+        ]
+        result = await self.collection.aggregate(pipeline).to_list(length=1)
+        if result:
+            return result[0].get("total", 0)
+        return 0
+
     async def get_last_completed_scan(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get the last successfully completed scan for a user"""
         return await self.find_one({"user_id": user_id, "status": "completed"}, sort=[("started_at", -1)])

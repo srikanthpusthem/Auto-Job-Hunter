@@ -45,7 +45,7 @@ async def normalize_job_batch(raw_jobs: List[Dict[str, Any]], system_prompt_temp
         return {"normalized_jobs": [], "discarded_count": len(raw_jobs), "discard_reasons": ["llm_parse_error"] * len(raw_jobs)}
 
 
-def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source: str, scan_run_id: str = None) -> Job:
+def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source: str, scan_run_id: str = None, user_id: str = "") -> Job:
     """
     Apply Python-level validation and create Job model with metadata.
     """
@@ -86,6 +86,7 @@ def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source
         "_id": normalized_job.get('source_id') or fingerprint,
         "source": source,
         "source_id": normalized_job.get('source_id'),
+        "user_id": user_id,
         "title": normalized_job['title'],
         "company": normalized_job.get('company'),
         "company_logo": normalized_job.get('company_logo'),
@@ -114,6 +115,7 @@ async def normalizer_node(state: AgentState):
     """
     print("--- Job Normalizer Agent ---")
     raw_jobs = state.get("raw_jobs", [])
+    user_id = state.get("user_id", "")
     run_meta = state.get("run_meta", {})
     scan_run_id = run_meta.get("scan_run_id")
     
@@ -151,7 +153,7 @@ async def normalizer_node(state: AgentState):
                 elif 'indeed' in source:
                     source = 'indeed'
                 
-                job = finalize_job(normalized_job, raw_job, source, scan_run_id)
+                job = finalize_job(normalized_job, raw_job, source, scan_run_id, user_id)
                 all_normalized.append(job)
             except Exception as e:
                 print(f"Failed to finalize job: {e}")
