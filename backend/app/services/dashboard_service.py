@@ -7,7 +7,7 @@ from backend.app.db.models import JobStatus
 class DashboardService:
     def __init__(self, db):
         self.job_repo = JobRepository(db)
-        self.run_repo = ScanHistoryRepository(db)
+        self.history_repo = ScanHistoryRepository(db)
 
     def format_relative_time(self, timestamp: datetime) -> str:
         """Format datetime as relative time (e.g., '2h ago')"""
@@ -34,28 +34,28 @@ class DashboardService:
         else:
             return "Just now"
 
-    async def get_stats(self, clerk_user_id: str) -> Dict[str, Any]:
+    async def get_stats(self, user_id: str) -> Dict[str, Any]:
         # Get basic counts
-        matched_count = await self.job_repo.count_by_status(JobStatus.MATCHED.value)
-        applied_count = await self.job_repo.count_by_status(JobStatus.APPLIED.value)
-        new_count = await self.job_repo.count_by_status(JobStatus.NEW.value)
+        matched_count = await self.job_repo.count_by_status(JobStatus.MATCHED.value, user_id)
+        applied_count = await self.job_repo.count_by_status(JobStatus.APPLIED.value, user_id)
+        new_count = await self.job_repo.count_by_status(JobStatus.NEW.value, user_id)
         pending_reviews = matched_count + new_count
-        
+
         # Get total jobs scanned from scan runs
-        total_scanned = await self.run_repo.get_total_scanned()
-        
+        total_scanned = await self.history_repo.get_total_scanned(user_id)
+
         # Get match score statistics
-        score_stats = await self.job_repo.get_match_score_stats()
-        
+        score_stats = await self.job_repo.get_match_score_stats(user_id)
+
         # Get status breakdown
-        status_breakdown = await self.job_repo.get_status_breakdown()
-        
+        status_breakdown = await self.job_repo.get_status_breakdown(user_id)
+
         # Get top sources
-        top_sources = await self.job_repo.count_by_source()
-        
+        top_sources = await self.job_repo.count_by_source(user_id)
+
         # Get recent activity
-        recent_runs = await self.run_repo.get_recent_runs(limit=5)
-        recent_jobs = await self.job_repo.get_recent_jobs(limit=5)
+        recent_runs = await self.history_repo.list_scans(user_id=user_id, limit=5)
+        recent_jobs = await self.job_repo.get_recent_jobs(limit=5, user_id=user_id)
         
         # Build activity feed
         activity = []

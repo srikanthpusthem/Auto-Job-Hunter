@@ -24,20 +24,22 @@ async def trigger_scan(
     user_service = UserService(db)
     run_service = RunService(db)
     job_service = JobService(db)
-    
+
     user = await user_service.get_user_by_clerk_id(request.clerk_user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     user_profile = user.get("profile", {})
-    
+    user_id = str(user.get("_id"))
+
     try:
-        scan_run_id = await run_service.start_run(user["_id"], request.sources)
+        scan_run_id = await run_service.start_run(user_id, request.sources)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     background_tasks.add_task(
         job_service.run_job_scan,
+        user_id,
         user_profile,
         request.clerk_user_id,
         request.sources,
@@ -65,7 +67,13 @@ async def list_jobs(
 ):
     job_service = JobService(db)
     run_service = RunService(db)
-    
+    user_service = UserService(db)
+
+    user = await user_service.get_user_by_clerk_id(clerk_user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user_id = str(user.get("_id"))
+
     filters = {
         "status": status,
         "scan_run_id": scan_run_id,
@@ -74,9 +82,9 @@ async def list_jobs(
         "source": source,
         "min_match_score": min_match_score
     }
-    
-    jobs = await job_service.list_jobs(filters, limit, sort_by, sort_order)
-    recent_runs = await run_service.get_recent_runs(limit=20)
+
+    jobs = await job_service.list_jobs(user_id, filters, limit, sort_by, sort_order)
+    recent_runs = await run_service.history_repo.list_scans(user_id=user_id, limit=20)
     
     return {
         "jobs": jobs,
