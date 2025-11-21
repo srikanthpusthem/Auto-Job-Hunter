@@ -1,0 +1,56 @@
+import json
+import os
+import asyncio
+from backend.agents.graph import AgentState
+from backend.agents.llm_client import llm_client
+from backend.db.models import Job, JobStatus
+
+async def match_job(job: Job, user_profile: dict, system_prompt_template: str) -> Job:
+    system_prompt = system_prompt_template.format(
+        user_profile=json.dumps(user_profile, indent=2),
+        job_details=job.model_dump_json(include={"title", "company", "description", "remote", "location", "skills_extracted"})
+    )
+    
+    response = await llm_client.generate_json(
+        prompt="Evaluate this job match.",
+        system_message=system_prompt
+    )
+    
+    try:
+        data = json.loads(response)
+        job.match_score = data.get("match_score", 0.0)
+        job.match_reasoning = data.get("match_reasoning", "")
+        job.missing_skills = data.get("missing_skills", [])
+        
+        if job.match_score >= 0.7: # Default threshold if not set in run_meta
+            job.status = JobStatus.MATCHED
+        else:
+            job.status = JobStatus.NEW  # Changed from REJECTED to NEW
+            
+        print(f"Job: {job.title}, Score: {job.match_score:.2f}, Missing: {len(job.missing_skills)} skills")
+        return job
+    except Exception as e:
+        print(f"Error matching job {job.id}: {e}")
+        return job
+
+async def matcher_node(state: AgentState):
+    print("--- Matching Agent ---")
+    normalized_jobs = state.get("normalized_jobs", [])
+    user_profile = state.get("user_profile", {})
+    run_meta = state.get("run_meta", {})
+    threshold = run_meta.get("match_threshold", 0.7)
+    
+    # Load prompt
+    prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "matcher.txt")
+    with open(prompt_path, "r") as f:
+        system_prompt_template = f.read()
+        
+    tasks = [match_job(job, user_profile, system_prompt_template) for job in normalized_jobs]
+    scored_jobs = await asyncio.gather(*tasks)
+    
+    # Filter matched jobs
+    matched_jobs = [job for job in scored_jobs if job.match_score >= threshold]
+    
+    print(f"Matched {len(matched_jobs)} out of {len(normalized_jobs)} jobs.")
+    
+    return {"matched_jobs": matched_jobs}
