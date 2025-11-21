@@ -1,6 +1,6 @@
 from typing import TypedDict, List, Dict, Any, Optional
 from langgraph.graph import StateGraph, END
-from backend.db.models import UserProfile, Job
+from backend.app.db.models import UserProfile, Job
 
 class AgentState(TypedDict):
     user_profile: Dict[str, Any]

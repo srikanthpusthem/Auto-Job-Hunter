@@ -22,27 +22,30 @@ v
 
 ## Backend Components
 
-### **FastAPI**
+### **FastAPI (Layered Architecture)**
 
-- Hosts API routes for:
-  - job scanning
-  - profile management
-  - outreach actions
-  - run history
-- Integrates with Clerk JWT for authentication.
-- Triggers LangGraph runs.
+- **API Layer** (`backend/app/api/`):
+  - Thin controllers that handle HTTP requests and responses.
+  - Routes: `/api/jobs`, `/api/users`, `/api/runs`, `/api/dashboard`.
+- **Service Layer** (`backend/app/services/`):
+  - Contains all business logic.
+  - Orchestrates interactions between DB, Agents, and External APIs.
+  - Services: `JobService`, `UserService`, `RunService`, `DashboardService`.
+- **Repository Layer** (`backend/app/db/repositories/`):
+  - Handles all database interactions.
+  - Repositories: `JobRepository`, `UserRepository`, `RunRepository`.
 
 ### **LangGraph**
 
-Agents:
-
-1. SupervisorAgent
-2. ScoutAgent
-3. JobNormalizerAgent
-4. ResumeProfilerAgent
-5. MatchingAgent
-6. OutreachAgent
-7. ReviewerAgent
+- Located in `backend/app/agents/`.
+- Agents:
+  1. SupervisorAgent
+  2. ScoutAgent
+  3. JobNormalizerAgent
+  4. ResumeProfilerAgent
+  5. MatchingAgent
+  6. OutreachAgent
+  7. ReviewerAgent
 
 State contains:
 
@@ -55,11 +58,12 @@ State contains:
 
 ### **MongoDB**
 
-Collections:
-
-- `users`
-- `scan_runs`
-- `matched_jobs`
+- Models defined in `backend/app/db/models.py`.
+- Collections:
+  - `users`
+  - `scan_runs`
+  - `matched_jobs`
+  - `run_logs`
 
 ### **Celery + Redis**
 

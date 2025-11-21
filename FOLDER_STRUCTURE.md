@@ -21,19 +21,41 @@ README.md
 backend/
 app/
 main.py
-core/
-config.py
-logging.py
-security.py
-api/
-routes_jobs.py
-routes_runs.py
-routes_profile.py
-routes_outreach.py
-init.py
-agents/
+api/ # Route Handlers (Thin Controllers)
+jobs/
+routes.py
+users/
+routes.py
+runs/
+routes.py
+dashboard/
+routes.py
+services/ # Business Logic
+job_service.py
+user_service.py
+run_service.py
+dashboard_service.py
+db/ # Database Layer
+models.py
+mongo.py
+repositories/
+base_repository.py
+user_repository.py
+job_repository.py
+run_repository.py
+agents/ # LangGraph Agents
 graph.py
 llm_client.py
+supervisor.py
+scout.py
+normalizer.py
+profiler.py
+matcher.py
+outreach.py
+reviewer.py
+tools_sources.py
+normalization_utils.py
+scraper_utils.py
 prompts/
 supervisor.txt
 scout.txt
@@ -42,21 +64,10 @@ profiler.txt
 matcher.txt
 outreach.txt
 reviewer.txt
-init.py
-tools_sources.py
-matchers.py
-db/
-mongo.py
-models.py
-repositories.py
-init.py
-workers/
-celery_app.py
-tasks.py
-playwright/
-linkedin_scraper.py
-indeed_scraper.py
-init.py
+core/
+config.py
+logging.py
+security.py
 utils/
 hashing.py
 time_utils.py
@@ -69,23 +80,30 @@ formatters.py
 frontend/
 src/
 components/
+dashboard/
+AgentStatus.jsx
+AgentTimeline.jsx
+jobs/
 JobCard.jsx
-MatchBadge.jsx
-OutreachModal.jsx
+KanbanBoard.jsx
+JobDetailModal.jsx
+ui/ # shadcn components
 pages/
 Dashboard.jsx
+JobsPage.jsx
+ProfilePage.jsx
+Settings.jsx
 Login.jsx
-Profile.jsx
 hooks/
-useUserProfile.js
-useJobScan.js
+useStartRun.js
+useStopRun.js
 services/
 apiClient.js
+runService.js
 jobService.js
-profileService.js
+userService.js
 store/
 userStore.js
-jobStore.js
 styles/
 globals.css
 
@@ -114,5 +132,5 @@ deploy_frontend.sh
 
 - Anti-Gravity must adhere strictly to this structure.
 - No new folders may be created unless I explicitly request them.
-- All LangGraph prompts must live in `agents/prompts/`.
-- All scraping logic must be inside `workers/playwright/`.
+- All LangGraph prompts must live in `backend/app/agents/prompts/`.
+- All scraping logic must be inside `backend/app/agents/tools_sources.py` or dedicated modules.

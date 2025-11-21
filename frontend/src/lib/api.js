@@ -87,6 +87,11 @@ export const jobsApi = {
     })
     return response.data
   },
+
+  updateStatus: async (jobId, status) => {
+    const response = await api.patch(`/api/jobs/${jobId}/status`, { status })
+    return response.data
+  },
 }
 
 // Dashboard API

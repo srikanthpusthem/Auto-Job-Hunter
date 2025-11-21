@@ -48,10 +48,12 @@ All scraper functions in `backend/agents/tools_sources.py` were updated to extra
 
 ## 4. Repository Layer
 
-- `backend/db/repositories.py` extended with:
-  - `find_by_id` and `find_by_fingerprint` in `JobRepository` for deduplication checks.
-  - Updated `get_matched_jobs` to return all jobs (status filtering moved to matcher).
-- `backend/db/models.py` now includes nested `SalaryInfo`, `OutreachContent`, and `JobMetadata` models.
+- **Location**: `backend/app/db/repositories/`.
+- **Structure**: Split into dedicated repositories:
+  - `JobRepository`: Handles job CRUD and deduplication (`find_by_fingerprint`).
+  - `UserRepository`: Handles user profile data.
+  - `RunRepository`: Handles scan run history.
+- **Models**: Defined in `backend/app/db/models.py`, including nested `SalaryInfo`, `OutreachContent`, and `JobMetadata`.
 
 ---
 
@@ -64,8 +66,10 @@ All scraper functions in `backend/agents/tools_sources.py` were updated to extra
 
 ## 6. API Endpoints
 
-- `backend/app/routes/jobs.py` updated to return the new `Job` model shape (including nested objects) to the frontend.
-- No breaking changes for existing routes; the response schema now matches the unified model.
+- **Location**: `backend/app/api/`.
+- **Structure**: Organized by domain (`jobs`, `users`, `runs`, `dashboard`).
+- **Logic**: All business logic has been moved to the **Service Layer** (`backend/app/services/`).
+- **Response Schema**: Returns the unified `Job` model shape (including nested objects) to the frontend.
 
 ---
 

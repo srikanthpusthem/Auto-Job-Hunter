@@ -7,13 +7,14 @@ import {
 } from 'lucide-react'
 import { dashboardApi } from '../lib/api'
 
+import AgentStatus from '../components/dashboard/AgentStatus'
+import AgentTimeline from '../components/dashboard/AgentTimeline'
+
 export default function Dashboard() {
   const { user } = useUser()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [agentStatus, setAgentStatus] = useState('idle') // idle, running, paused
-  const [autoScanEnabled, setAutoScanEnabled] = useState(true)
 
   // Load data
   useEffect(() => {
@@ -35,20 +36,6 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // Mock triggering a scan for the "Agent" feel
-  const handleStartAgent = async () => {
-    setAgentStatus('running')
-    // In a real app, this would trigger the backend
-    // await jobsApi.triggerScan(...)
-    
-    // Simulate timeline progress
-    setTimeout(() => setAgentStatus('idle'), 5000)
-  }
-
-  const toggleAutoScan = () => {
-    setAutoScanEnabled(!autoScanEnabled)
   }
 
   const formatNumber = (num) => num?.toLocaleString() || '0'
@@ -76,113 +63,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header & Agent Status */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between flex-wrap gap-4">
-      <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">JobHunter AI</h1>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1.5 ${
-                agentStatus === 'running' 
-                  ? 'bg-green-50 text-green-700 border-green-200' 
-                  : agentStatus === 'paused'
-                  ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                  : 'bg-gray-100 text-gray-600 border-gray-200'
-              }`}>
-                <div className={`w-2 h-2 rounded-full ${
-                  agentStatus === 'running' ? 'bg-green-500 animate-pulse' : 
-                  agentStatus === 'paused' ? 'bg-yellow-500' : 'bg-gray-400'
-                }`} />
-                {agentStatus === 'running' ? 'Running' : agentStatus === 'paused' ? 'Paused' : 'Idle'}
-              </span>
-            </div>
-            <p className="text-gray-500 mt-1 flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Next scan: Tomorrow at 6:00 AM
-            </p>
-          </div>
+      {/* Agent Status Panel */}
+      <AgentStatus />
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
-              <span className="text-sm font-medium text-gray-700">Daily Auto-Scan</span>
-              <button 
-                onClick={toggleAutoScan}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  autoScanEnabled ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  autoScanEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
-            </div>
-            
-            {agentStatus === 'running' ? (
-              <button 
-                onClick={() => setAgentStatus('idle')}
-                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 font-medium rounded-lg hover:bg-red-100 transition-colors"
-              >
-                <Pause className="w-4 h-4" />
-                Stop Agent
-              </button>
-            ) : (
-              <button 
-                onClick={handleStartAgent}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200"
-              >
-                <Play className="w-4 h-4" />
-                Run Now
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Agent Timeline Visualization */}
-        {agentStatus === 'running' && (
-          <div className="p-6 bg-slate-50 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Live Agent Activity</h3>
-            <div className="space-y-4">
-              {/* Mock Timeline Items */}
-              <TimelineItem 
-                status="completed" 
-                text="Planning search strategy based on profile..." 
-                time="2s ago" 
-              />
-              <TimelineItem 
-                status="active" 
-                text="Scanning Google Jobs & LinkedIn..." 
-                time="Processing..." 
-              />
-              <TimelineItem 
-                status="pending" 
-                text="Analyzing match fit for 12 new jobs..." 
-              />
-              <TimelineItem 
-                status="pending" 
-                text="Drafting personalized outreach..." 
-              />
-            </div>
-          </div>
-        )}
-        
-        {/* Last Scan Summary (if idle) */}
-        {agentStatus !== 'running' && (
-          <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center gap-6 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span>Last scan completed 2 hours ago</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-blue-600" />
-              <span>143 jobs analyzed</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-purple-600" />
-              <span>8 high-match jobs found</span>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Agent Timeline */}
+      <AgentTimeline />
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -220,7 +105,7 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Left Column: Recent Activity */}
         <div className="lg:col-span-2 space-y-6">
-              <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
             <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</button>
           </div>
@@ -242,14 +127,14 @@ export default function Dashboard() {
                     <p className="text-sm font-medium text-gray-900">{activity.message}</p>
                     <p className="text-sm text-gray-500 mt-0.5">{activity.details}</p>
                     <p className="text-xs text-gray-400 mt-2">{activity.relative_time}</p>
-                </div>
+                  </div>
                 </div>
               ))
             ) : (
               <div className="p-8 text-center text-gray-500">No recent activity</div>
             )}
-              </div>
-      </div>
+          </div>
+        </div>
 
         {/* Right Column: Insights & Sources */}
         <div className="space-y-6">
@@ -281,7 +166,7 @@ export default function Dashboard() {
                     <span className="capitalize text-gray-700">{source.source.replace('_', ' ')}</span>
                   </div>
                   <span className="font-medium text-gray-900">{source.count}</span>
-            </div>
+                </div>
               ))}
               {(!stats?.top_sources || stats.top_sources.length === 0) && (
                 <p className="text-gray-500 text-sm">No source data yet</p>
@@ -311,21 +196,3 @@ function StatCard({ title, value, icon, color, bg }) {
   )
 }
 
-function TimelineItem({ status, text, time }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="flex flex-col items-center">
-        <div className={`w-2 h-2 rounded-full mt-2 ${
-          status === 'completed' ? 'bg-green-500' :
-          status === 'active' ? 'bg-blue-500 animate-pulse' :
-          'bg-gray-300'
-        }`} />
-        {status !== 'last' && <div className="w-0.5 h-6 bg-gray-200 my-1" />}
-      </div>
-      <div className={`${status === 'pending' ? 'text-gray-400' : 'text-gray-700'} text-sm flex-1 flex justify-between`}>
-        <span>{text}</span>
-        {time && <span className="text-xs text-gray-400">{time}</span>}
-      </div>
-    </div>
-  )
-}

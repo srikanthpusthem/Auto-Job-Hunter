@@ -1,9 +1,9 @@
 import json
 import os
 import asyncio
-from backend.agents.graph import AgentState
-from backend.agents.llm_client import llm_client
-from backend.db.models import Job, JobStatus
+from backend.app.agents.graph import AgentState
+from backend.app.agents.llm_client import llm_client
+from backend.app.db.models import Job, JobStatus
 
 async def match_job(job: Job, user_profile: dict, system_prompt_template: str) -> Job:
     # Include keywords in user profile for matching

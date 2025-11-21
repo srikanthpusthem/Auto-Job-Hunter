@@ -137,3 +137,23 @@ class ScanRun(BaseModel):
     started_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
     error: Optional[str] = None
+
+class RunLog(BaseModel):
+    """Log entry for agent run timeline"""
+    run_id: Optional[str] = None
+    step: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+class OutreachType(str, Enum):
+    EMAIL = "email"
+    LINKEDIN = "linkedin"
+    FOLLOW_UP = "follow_up"
+
+class OutreachTemplate(BaseModel):
+    id: str = Field(alias="_id")
+    user_id: str
+    name: str
+    subject: Optional[str] = None
+    content: str
+    type: OutreachType = OutreachType.EMAIL
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

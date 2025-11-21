@@ -1,8 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
-from backend.app.routes import users, jobs, dashboard
-from backend.db.mongo import db
+from backend.app.api.users import routes as users
+from backend.app.api.jobs import routes as jobs
+from backend.app.api.dashboard import routes as dashboard
+from backend.app.api.runs import routes as runs
+from backend.app.api.outreach import templates as outreach_templates
+from backend.app.db.mongo import db
 
 app = FastAPI(title="Auto Job Hunter API", version="1.0.0")
 
@@ -30,6 +34,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(jobs.router)
 app.include_router(dashboard.router)
+app.include_router(runs.router)
 
 @app.get("/")
 async def root():

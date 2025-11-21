@@ -1,6 +1,6 @@
 import asyncio
-from backend.agents.graph import AgentState
-from backend.agents.tools_sources import (
+from backend.app.agents.graph import AgentState
+from backend.app.agents.tools_sources import (
     search_google_jobs_serpapi,
     fetch_yc_jobs,
     fetch_wellfound_jobs,

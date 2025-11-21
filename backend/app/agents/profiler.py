@@ -1,7 +1,7 @@
 import json
 import os
-from backend.agents.graph import AgentState
-from backend.agents.llm_client import llm_client
+from backend.app.agents.graph import AgentState
+from backend.app.agents.llm_client import llm_client
 
 async def profiler_node(state: AgentState):
     print("--- Resume Profiler Agent ---")

@@ -8,7 +8,7 @@ from serpapi import Client
 from bs4 import BeautifulSoup
 import aiohttp
 from backend.core.config import settings
-from backend.agents.scraper_utils import retry_async
+from backend.app.agents.scraper_utils import retry_async
 
 
 @retry_async(max_attempts=2, delay=1.0)

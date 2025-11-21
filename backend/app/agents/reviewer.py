@@ -1,10 +1,10 @@
 import json
 import os
 import asyncio
-from backend.agents.graph import AgentState
-from backend.agents.llm_client import llm_client
-from backend.db.mongo import get_database
-from backend.db.repositories import JobRepository
+from backend.app.agents.graph import AgentState
+from backend.app.agents.llm_client import llm_client
+from backend.app.db.mongo import get_database
+from backend.app.db.repositories.job_repository import JobRepository
 
 async def reviewer_node(state: AgentState):
     print("--- Reviewer Agent ---")
