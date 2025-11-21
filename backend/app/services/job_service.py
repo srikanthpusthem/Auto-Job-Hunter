@@ -39,11 +39,13 @@ class JobService:
             "user_id": user_id,
             "run_id": scan_run_id,
             "user_profile": user_profile,
+            "user_id": clerk_user_id,
             "run_meta": {
                 "sources_used": sources or ["google_jobs", "yc"],
                 "match_threshold": match_threshold,
                 "scan_run_id": scan_run_id
             },
+            "run_id": scan_run_id,
             "search_query": {
                 "keywords": search_keywords,
                 "location": location or user_profile.get("preferences", {}).get("location", "Remote")

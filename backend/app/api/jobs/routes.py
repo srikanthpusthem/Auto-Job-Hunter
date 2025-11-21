@@ -41,6 +41,7 @@ async def trigger_scan(
         job_service.run_job_scan,
         user_id,
         user_profile,
+        request.clerk_user_id,
         request.sources,
         request.match_threshold,
         request.keywords,
