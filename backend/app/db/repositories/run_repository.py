@@ -1,12 +1,11 @@
 from typing import List, Optional, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime
-from backend.app.db.models import ScanRun
 from backend.app.db.repositories.base_repository import BaseRepository
 
 class RunRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
-        super().__init__(db, "scan_runs")
+        super().__init__(db, "scan_history")
     
     async def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get most recent scan runs"""
@@ -33,13 +32,11 @@ class RunRepository(BaseRepository):
     
     async def get_last_completed_run(self) -> Optional[Dict[str, Any]]:
         """Get the last successfully completed run"""
-        return await self.find_one({"status": "completed"})
+        return await self.find_one({"status": "completed"}, sort=[("started_at", -1)])
     
     async def get_last_run(self) -> Optional[Dict[str, Any]]:
         """Get the last run regardless of status"""
-        cursor = self.collection.find({}).sort("started_at", -1).limit(1)
-        results = await cursor.to_list(length=1)
-        return results[0] if results else None
+        return await self.find_one({}, sort=[("started_at", -1)])
 
 class RunLogRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):

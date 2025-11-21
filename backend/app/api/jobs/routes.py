@@ -76,7 +76,7 @@ async def list_jobs(
     }
     
     jobs = await job_service.list_jobs(filters, limit, sort_by, sort_order)
-    recent_runs = await run_service.run_repo.get_recent_runs(limit=20) 
+    recent_runs = await run_service.get_recent_runs(limit=20)
     
     return {
         "jobs": jobs,
