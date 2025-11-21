@@ -1,13 +1,13 @@
 from typing import Dict, Any, List
 from datetime import datetime
 from backend.app.db.repositories.job_repository import JobRepository
-from backend.app.db.repositories.run_repository import RunRepository
+from backend.app.db.repositories.scan_history_repository import ScanHistoryRepository
 from backend.app.db.models import JobStatus
 
 class DashboardService:
     def __init__(self, db):
         self.job_repo = JobRepository(db)
-        self.run_repo = RunRepository(db)
+        self.run_repo = ScanHistoryRepository(db)
 
     def format_relative_time(self, timestamp: datetime) -> str:
         """Format datetime as relative time (e.g., '2h ago')"""

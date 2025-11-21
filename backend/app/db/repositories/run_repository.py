@@ -1,12 +1,11 @@
 from typing import List, Optional, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime
-from backend.app.db.models import ScanRun
 from backend.app.db.repositories.base_repository import BaseRepository
 
 class RunRepository(BaseRepository):
     def __init__(self, db: AsyncIOMotorDatabase):
-        super().__init__(db, "scan_runs")
+        super().__init__(db, "scan_history")
     
     async def get_recent_runs(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get most recent scan runs"""
