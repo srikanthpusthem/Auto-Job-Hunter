@@ -82,8 +82,11 @@ def finalize_job(normalized_job: Dict[str, Any], raw_job: Dict[str, Any], source
     )
     
     # Create Job model
+    base_id = normalized_job.get('source_id') or fingerprint
+    namespaced_id = f"{user_id}:{base_id}" if user_id else base_id
+
     job_data = {
-        "_id": normalized_job.get('source_id') or fingerprint,
+        "_id": namespaced_id,
         "source": source,
         "source_id": normalized_job.get('source_id'),
         "user_id": user_id,
