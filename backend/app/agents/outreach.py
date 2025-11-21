@@ -4,6 +4,7 @@ import asyncio
 from backend.app.agents.graph import AgentState
 from backend.app.agents.llm_client import llm_client
 from backend.app.db.models import Job, OutreachContent
+from backend.app.utils.timeline import log_step
 
 async def generate_outreach(job: Job, user_profile: dict, system_prompt_template: str) -> dict:
     system_prompt = system_prompt_template.format(

@@ -10,7 +10,7 @@ class JobService:
         self.job_repo = JobRepository(db)
         self.run_repo = RunRepository(db)
 
-    async def run_job_scan(self, user_profile: dict, sources: List[str], match_threshold: float, keywords: List[str] = None, location: str = None, scan_run_id: str = None):
+    async def run_job_scan(self, user_profile: dict, clerk_user_id: str, sources: List[str], match_threshold: float, keywords: List[str] = None, location: str = None, scan_run_id: str = None):
         """Background task to run the LangGraph workflow"""
         # Import agents from new location
         from backend.app.agents.supervisor import supervisor_node
@@ -35,11 +35,13 @@ class JobService:
         # Initialize state
         state = {
             "user_profile": user_profile,
+            "user_id": clerk_user_id,
             "run_meta": {
                 "sources_used": sources or ["google_jobs", "yc"],
                 "match_threshold": match_threshold,
                 "scan_run_id": scan_run_id
             },
+            "run_id": scan_run_id,
             "search_query": {
                 "keywords": search_keywords,
                 "location": location or user_profile.get("preferences", {}).get("location", "Remote")
