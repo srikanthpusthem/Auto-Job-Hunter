@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import { UserButton } from '@clerk/clerk-react'
-import { LayoutDashboard, Briefcase, User, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Briefcase, User, Menu, X, Zap, Send, BarChart2, Settings } from 'lucide-react'
 import { useState } from 'react'
 
 export default function DashboardLayout() {
@@ -9,7 +9,11 @@ export default function DashboardLayout() {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Automations', href: '/automations', icon: Zap },
     { name: 'Jobs', href: '/jobs', icon: Briefcase },
+    { name: 'Outreach', href: '/outreach', icon: Send },
+    { name: 'Analytics', href: '/analytics', icon: BarChart2 },
+    { name: 'Settings', href: '/settings', icon: Settings },
     { name: 'Profile', href: '/profile', icon: User },
   ]
 

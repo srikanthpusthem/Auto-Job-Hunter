@@ -4,6 +4,10 @@ import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import ProfilePage from './pages/ProfilePage'
 import JobsPage from './pages/JobsPage'
+import Automations from './pages/Automations'
+import Outreach from './pages/Outreach'
+import Analytics from './pages/Analytics'
+import Settings from './pages/Settings'
 import DashboardLayout from './components/DashboardLayout'
 
 function App() {
@@ -29,14 +33,34 @@ function App() {
               <Dashboard />
             </SignedIn>
           } />
-          <Route path="/profile" element={
+          <Route path="/automations" element={
             <SignedIn>
-              <ProfilePage />
+              <Automations />
             </SignedIn>
           } />
           <Route path="/jobs" element={
             <SignedIn>
               <JobsPage />
+            </SignedIn>
+          } />
+          <Route path="/outreach" element={
+            <SignedIn>
+              <Outreach />
+            </SignedIn>
+          } />
+          <Route path="/analytics" element={
+            <SignedIn>
+              <Analytics />
+            </SignedIn>
+          } />
+          <Route path="/settings" element={
+            <SignedIn>
+              <Settings />
+            </SignedIn>
+          } />
+          <Route path="/profile" element={
+            <SignedIn>
+              <ProfilePage />
             </SignedIn>
           } />
         </Route>

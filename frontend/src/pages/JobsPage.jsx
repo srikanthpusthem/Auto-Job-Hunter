@@ -1,19 +1,31 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '@clerk/clerk-react'
-import { MapPin, Briefcase, DollarSign, Calendar, ExternalLink, Mail, Loader2, Filter, X, ChevronDown } from 'lucide-react'
+import { 
+  MapPin, Briefcase, DollarSign, Calendar, ExternalLink, Mail, 
+  Loader2, Filter, X, ChevronDown, CheckCircle, Clock, 
+  FileText, Send, XCircle, Eye
+} from 'lucide-react'
 import { jobsApi } from '../lib/api'
 import { useJobStore } from '../store/jobStore'
+
+const KANBAN_COLUMNS = [
+  { id: 'new', title: 'New Matches', status: 'new', color: 'bg-blue-50 border-blue-200' },
+  { id: 'pending', title: 'Pending Review', status: 'matched', color: 'bg-yellow-50 border-yellow-200' },
+  { id: 'outreach', title: 'Ready for Outreach', status: 'outreach', color: 'bg-purple-50 border-purple-200' },
+  { id: 'draft', title: 'Draft Created', status: 'draft', color: 'bg-indigo-50 border-indigo-200' },
+  { id: 'applied', title: 'Applied', status: 'applied', color: 'bg-green-50 border-green-200' },
+  { id: 'rejected', title: 'Rejected', status: 'rejected', color: 'bg-red-50 border-red-200' },
+]
 
 export default function JobsPage() {
   const { user } = useUser()
   const { jobs, setJobs, loading, setLoading } = useJobStore()
   const [generatingOutreach, setGeneratingOutreach] = useState(null)
-  const [scanRuns, setScanRuns] = useState([])
+  const [selectedJob, setSelectedJob] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [scanRuns, setScanRuns] = useState([])
   
-  // Filter states
   const [filters, setFilters] = useState({
-    status: 'all',
     scan_run_id: 'all',
     date_from: '',
     date_to: '',
@@ -21,7 +33,6 @@ export default function JobsPage() {
     min_match_score: '',
     sort_by: 'created_at',
     sort_order: 'desc',
-    group_by: 'none' // none, scan_run, date_posted, source
   })
 
   useEffect(() => {
@@ -36,7 +47,6 @@ export default function JobsPage() {
     try {
       const filterParams = {
         limit: 200,
-        ...(filters.status !== 'all' && { status: filters.status }),
         ...(filters.scan_run_id !== 'all' && { scan_run_id: filters.scan_run_id }),
         ...(filters.date_from && { date_from: filters.date_from }),
         ...(filters.date_to && { date_to: filters.date_to }),
@@ -61,11 +71,11 @@ export default function JobsPage() {
     setGeneratingOutreach(job._id)
     try {
       const result = await jobsApi.generateOutreach(job._id, user.id)
-      const emailText = result.email_subject 
-        ? `Subject: ${result.email_subject}\n\n${result.email_body || ''}`
-        : result.email_body || 'No email content generated'
-      const linkedinText = result.linkedin_dm || 'No LinkedIn message generated'
-      alert(`Outreach generated!\n\nEmail:\n${emailText}\n\nLinkedIn:\n${linkedinText}`)
+      // Update job status to 'draft' after outreach generated
+      setJobs(prev => prev.map(j => 
+        j._id === job._id ? { ...j, status: 'draft', outreach: result } : j
+      ))
+      alert('Outreach generated! Check the Draft Created column.')
     } catch (error) {
       console.error('Error generating outreach:', error)
       alert('Failed to generate outreach')
@@ -74,16 +84,16 @@ export default function JobsPage() {
     }
   }
 
-  const getMatchColor = (score) => {
-    if (score >= 0.9) return 'text-green-600 bg-green-50'
-    if (score >= 0.7) return 'text-blue-600 bg-blue-50'
-    return 'text-orange-600 bg-orange-50'
+  const handleMoveJob = (jobId, newStatus) => {
+    setJobs(prev => prev.map(j => 
+      j._id === jobId ? { ...j, status: newStatus } : j
+    ))
   }
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'Unknown'
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  const getMatchColor = (score) => {
+    if (score >= 0.9) return 'text-green-600 bg-green-50 border-green-200'
+    if (score >= 0.7) return 'text-blue-600 bg-blue-50 border-blue-200'
+    return 'text-orange-600 bg-orange-50 border-orange-200'
   }
 
   const formatRelativeDate = (dateStr) => {
@@ -94,84 +104,28 @@ export default function JobsPage() {
     
     if (diffDays === 0) return 'Today'
     if (diffDays === 1) return 'Yesterday'
-    if (diffDays < 7) return `${diffDays} days ago`
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`
-    return `${Math.floor(diffDays / 365)} years ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+    return `${Math.floor(diffDays / 30)}mo ago`
   }
 
-  // Group jobs based on group_by filter
-  const groupedJobs = useMemo(() => {
-    if (filters.group_by === 'none') {
-      return { 'All Jobs': jobs }
-    }
-    
-    if (filters.group_by === 'scan_run') {
-      const grouped = {}
-      jobs.forEach(job => {
-        const runId = job.metadata?.scan_run_id || 'unknown'
-        const run = scanRuns.find(r => r._id === runId)
-        const runLabel = run 
-          ? `Scan ${formatDate(run.started_at)} (${run.jobs_matched || 0} jobs)`
-          : 'Unknown Scan'
-        if (!grouped[runLabel]) grouped[runLabel] = []
-        grouped[runLabel].push(job)
+  // Group jobs by status/column
+  const jobsByColumn = useMemo(() => {
+    const grouped = {}
+    KANBAN_COLUMNS.forEach(col => {
+      grouped[col.id] = jobs.filter(job => {
+        const status = job.status?.toLowerCase() || 'new'
+        if (col.id === 'new') return status === 'new'
+        if (col.id === 'pending') return status === 'matched'
+        if (col.id === 'outreach') return status === 'outreach' || (status === 'matched' && job.outreach?.email_subject)
+        if (col.id === 'draft') return status === 'draft'
+        if (col.id === 'applied') return status === 'applied'
+        if (col.id === 'rejected') return status === 'rejected'
+        return false
       })
-      return grouped
-    }
-    
-    if (filters.group_by === 'date_posted') {
-      const grouped = {}
-      jobs.forEach(job => {
-        const postedDate = job.posted_at || job.metadata?.collected_at
-        const dateKey = postedDate 
-          ? formatDate(postedDate)
-          : 'Unknown Date'
-        if (!grouped[dateKey]) grouped[dateKey] = []
-        grouped[dateKey].push(job)
-      })
-      return grouped
-    }
-    
-    if (filters.group_by === 'source') {
-      const grouped = {}
-      jobs.forEach(job => {
-        const source = job.source || 'unknown'
-        const sourceLabel = source.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-        if (!grouped[sourceLabel]) grouped[sourceLabel] = []
-        grouped[sourceLabel].push(job)
-      })
-      return grouped
-    }
-    
-    return { 'All Jobs': jobs }
-  }, [jobs, filters.group_by, scanRuns])
-
-  const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      scan_run_id: 'all',
-      date_from: '',
-      date_to: '',
-      source: 'all',
-      min_match_score: '',
-      sort_by: 'created_at',
-      sort_order: 'desc',
-      group_by: 'none'
     })
-  }
-
-  const activeFiltersCount = useMemo(() => {
-    let count = 0
-    if (filters.status !== 'all') count++
-    if (filters.scan_run_id !== 'all') count++
-    if (filters.date_from) count++
-    if (filters.date_to) count++
-    if (filters.source !== 'all') count++
-    if (filters.min_match_score) count++
-    if (filters.group_by !== 'none') count++
-    return count
-  }, [filters])
+    return grouped
+  }, [jobs])
 
   if (loading) {
     return (
@@ -186,99 +140,40 @@ export default function JobsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Matched Jobs</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Job Pipeline</h1>
           <p className="text-gray-600 mt-1">
-            {jobs.length} jobs found matching your profile
+            {jobs.length} jobs in your pipeline
           </p>
         </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              showFilters || activeFiltersCount > 0
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Filter className="w-4 h-4" />
-            Filters
-            {activeFiltersCount > 0 && (
-              <span className="bg-white text-blue-600 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
-        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+            showFilters ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <Filter className="w-4 h-4" />
+          Filters
+        </button>
       </div>
 
       {/* Filters Panel */}
       {showFilters && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Filter & Sort Jobs</h2>
-            <button
-              onClick={clearFilters}
-              className="text-sm text-blue-600 hover:text-blue-700"
-            >
-              Clear All
-            </button>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="new">New</option>
-                <option value="matched">Matched</option>
-                <option value="applied">Applied</option>
-                <option value="rejected">Rejected</option>
-                <option value="interview">Interview</option>
-                <option value="offer">Offer</option>
-              </select>
-            </div>
-
-            {/* Scan Run Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Scan Run</label>
-              <select
-                value={filters.scan_run_id}
-                onChange={(e) => setFilters(prev => ({ ...prev, scan_run_id: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Scans</option>
-                {scanRuns.map(run => (
-                  <option key={run._id} value={run._id}>
-                    {formatDate(run.started_at)} ({run.jobs_matched || 0} jobs)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Source Filter */}
+          <div className="grid md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
               <select
                 value={filters.source}
                 onChange={(e) => setFilters(prev => ({ ...prev, source: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="all">All Sources</option>
                 <option value="google_jobs">Google Jobs</option>
                 <option value="yc">YC Jobs</option>
                 <option value="linkedin">LinkedIn</option>
                 <option value="indeed">Indeed</option>
-                <option value="wellfound">Wellfound</option>
               </select>
             </div>
-
-            {/* Min Match Score */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Min Match Score</label>
               <input
@@ -289,137 +184,194 @@ export default function JobsPage() {
                 value={filters.min_match_score}
                 onChange={(e) => setFilters(prev => ({ ...prev, min_match_score: e.target.value }))}
                 placeholder="0.0 - 1.0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
-
-            {/* Date From */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Posted From</label>
               <input
                 type="date"
                 value={filters.date_from}
                 onChange={(e) => setFilters(prev => ({ ...prev, date_from: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
-
-            {/* Date To */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Posted To</label>
               <input
                 type="date"
                 value={filters.date_to}
                 onChange={(e) => setFilters(prev => ({ ...prev, date_to: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
-            </div>
-
-            {/* Sort By */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-              <select
-                value={filters.sort_by}
-                onChange={(e) => setFilters(prev => ({ ...prev, sort_by: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="created_at">Date Added</option>
-                <option value="posted_at">Date Posted</option>
-                <option value="match_score">Match Score</option>
-              </select>
-            </div>
-
-            {/* Sort Order */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Order</label>
-              <select
-                value={filters.sort_order}
-                onChange={(e) => setFilters(prev => ({ ...prev, sort_order: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="desc">Newest First</option>
-                <option value="asc">Oldest First</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Group By */}
-          <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Group By</label>
-            <div className="flex gap-2">
-              {['none', 'scan_run', 'date_posted', 'source'].map(option => (
-                <button
-                  key={option}
-                  onClick={() => setFilters(prev => ({ ...prev, group_by: option }))}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    filters.group_by === option
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {option === 'none' ? 'No Grouping' : option === 'scan_run' ? 'Scan Run' : option === 'date_posted' ? 'Date Posted' : 'Source'}
-                </button>
-              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* Jobs List - Grouped */}
-      <div className="space-y-6">
-        {Object.entries(groupedJobs).map(([groupName, groupJobs]) => (
-          <div key={groupName}>
-            {filters.group_by !== 'none' && (
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 mb-1">{groupName}</h2>
-                <p className="text-sm text-gray-600">{groupJobs.length} jobs</p>
-              </div>
-            )}
+      {/* Kanban Board */}
+      <div className="flex gap-4 overflow-x-auto pb-4">
+        {KANBAN_COLUMNS.map(column => (
+          <div 
+            key={column.id} 
+            className={`flex-shrink-0 w-80 ${column.color} rounded-xl border-2 p-4`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900">{column.title}</h3>
+              <span className="px-2 py-1 bg-white rounded-full text-xs font-medium text-gray-600">
+                {jobsByColumn[column.id]?.length || 0}
+              </span>
+            </div>
             
-            <div className="space-y-4">
-              {groupJobs.map((job) => (
-                <div
-                  key={job._id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-xl font-bold text-gray-900">{job.title}</h3>
-                        {job.match_score && (
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getMatchColor(job.match_score)}`}>
-                            {Math.round(job.match_score * 100)}% Match
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <p className="text-gray-600 font-medium">{job.company}</p>
-                        {job.source && (
-                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                            {job.source.replace('_', ' ')}
-                          </span>
-                        )}
-                        {job.metadata?.scan_run_id && (
-                          <span className="text-xs text-gray-500">
-                            Scan: {formatRelativeDate(scanRuns.find(r => r._id === job.metadata.scan_run_id)?.started_at)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+            <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+              {jobsByColumn[column.id]?.map(job => (
+                <JobCard 
+                  key={job._id} 
+                  job={job} 
+                  onView={() => setSelectedJob(job)}
+                  onGenerateOutreach={() => handleGenerateOutreach(job)}
+                  onMove={handleMoveJob}
+                  generating={generatingOutreach === job._id}
+                  getMatchColor={getMatchColor}
+                  formatRelativeDate={formatRelativeDate}
+                />
+              ))}
+              {(!jobsByColumn[column.id] || jobsByColumn[column.id].length === 0) && (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No jobs in this stage
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Job Detail Modal */}
+      {selectedJob && (
+        <JobDetailModal 
+          job={selectedJob} 
+          onClose={() => setSelectedJob(null)}
+          onGenerateOutreach={() => handleGenerateOutreach(selectedJob)}
+          onMove={handleMoveJob}
+        />
+      )}
+
+      {jobs.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-xl">
+          <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-900 mb-2">No jobs found</h3>
+          <p className="text-gray-600">Start a job scan from the Dashboard</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function JobCard({ job, onView, onGenerateOutreach, onMove, generating, getMatchColor, formatRelativeDate }) {
+  return (
+    <div 
+      className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+      onClick={onView}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1 min-w-0">
+          <h4 className="font-semibold text-gray-900 truncate">{job.title}</h4>
+          <p className="text-sm text-gray-600 truncate">{job.company}</p>
+        </div>
+        {job.match_score && (
+          <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium border ${getMatchColor(job.match_score)}`}>
+            {Math.round(job.match_score * 100)}%
+          </span>
+        )}
+      </div>
+
+      {job.description && (
+        <p className="text-xs text-gray-500 line-clamp-2 mb-3">{job.description.substring(0, 100)}...</p>
+      )}
+
+      <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+        <MapPin className="w-3 h-3" />
+        <span className="truncate">{job.location || 'Remote'}</span>
+        <span>•</span>
+        <span>{formatRelativeDate(job.posted_at || job.metadata?.collected_at)}</span>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onGenerateOutreach()
+          }}
+          disabled={generating}
+          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700 disabled:opacity-50"
+        >
+          {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+          Outreach
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onMove(job._id, 'applied')
+          }}
+          className="px-2 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700"
+        >
+          <CheckCircle className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function JobDetailModal({ job, onClose, onGenerateOutreach, onMove }) {
+  const [activeTab, setActiveTab] = useState('details')
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200 flex items-start justify-between">
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{job.title}</h2>
+            <p className="text-lg text-gray-600">{job.company}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 flex gap-4 px-6">
+          {['details', 'insights', 'outreach'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`py-3 px-2 border-b-2 font-medium capitalize transition-colors ${
+                activeTab === tab
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === 'details' && (
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-4">Job Information</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400" />
+                    <span>{job.location || 'Not specified'}</span>
+                    {job.remote && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Remote</span>}
                   </div>
-
-                  {job.description && (
-                    <p className="text-gray-700 mb-4 line-clamp-2">{job.description.substring(0, 200)}...</p>
-                  )}
-
-                  <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
-                      {job.location || 'Location not specified'}
-                    </div>
-                    {job.salary && (job.salary.min || job.salary.max) && (
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="w-4 h-4" />
+                  {job.salary && (job.salary.min || job.salary.max) && (
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-gray-400" />
+                      <span>
                         {job.salary.min && job.salary.max
                           ? `${job.salary.currency || '$'}${job.salary.min.toLocaleString()}-${job.salary.max.toLocaleString()}`
                           : job.salary.min
@@ -427,67 +379,127 @@ export default function JobsPage() {
                           : `${job.salary.currency || '$'}${job.salary.max.toLocaleString()}`
                         }
                         {job.salary.interval && `/${job.salary.interval}`}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      Posted {formatRelativeDate(job.posted_at || job.metadata?.collected_at)}
+                      </span>
                     </div>
-                    {job.remote && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Remote</span>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3">
-                    {(job.apply_url || job.listing_url) && (
-                      <a
-                        href={job.apply_url || job.listing_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        {job.apply_url ? 'Apply Now' : 'View Listing'}
-                      </a>
-                    )}
-                    {job.listing_url && job.apply_url && job.listing_url !== job.apply_url && (
-                      <a
-                        href={job.listing_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        View Listing
-                      </a>
-                    )}
-                    <button
-                      onClick={() => handleGenerateOutreach(job)}
-                      disabled={generatingOutreach === job._id}
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                    >
-                      {generatingOutreach === job._id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Mail className="w-4 h-4" />
-                      )}
-                      Generate Outreach
-                    </button>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <span>Posted {new Date(job.posted_at || job.metadata?.collected_at).toLocaleDateString()}</span>
                   </div>
                 </div>
-              ))}
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-4">Description</h3>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description || 'No description available'}</p>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          )}
 
-      {jobs.length === 0 && (
-        <div className="text-center py-12">
-          <Briefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-medium text-gray-900 mb-2">No jobs found</h3>
-          <p className="text-gray-600">Try adjusting your filters or start a new search from the Dashboard</p>
+          {activeTab === 'insights' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-4">AI Match Analysis</h3>
+                {job.match_score && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Overall Match Score</span>
+                      <span className="text-lg font-bold text-blue-600">{Math.round(job.match_score * 100)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all"
+                        style={{ width: `${job.match_score * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {job.match_reasoning && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-700">{job.match_reasoning}</p>
+                  </div>
+                )}
+              </div>
+              {job.skills_extracted && job.skills_extracted.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Required Skills</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {job.skills_extracted.map((skill, idx) => (
+                      <span key={idx} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'outreach' && (
+            <div className="space-y-4">
+              {job.outreach?.email_subject ? (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Generated Outreach</h3>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500">Subject</label>
+                      <p className="text-sm text-gray-900">{job.outreach.email_subject}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500">Email Body</label>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.outreach.email_body}</p>
+                    </div>
+                    {job.outreach.linkedin_dm && (
+                      <div>
+                        <label className="text-xs font-medium text-gray-500">LinkedIn DM</label>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.outreach.linkedin_dm}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Mail className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-4">No outreach generated yet</p>
+                  <button
+                    onClick={onGenerateOutreach}
+                    className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700"
+                  >
+                    Generate Outreach
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Footer Actions */}
+        <div className="p-6 border-t border-gray-200 flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => onMove(job._id, 'applied')}
+              className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700"
+            >
+              Mark as Applied
+            </button>
+            <button
+              onClick={() => onMove(job._id, 'rejected')}
+              className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700"
+            >
+              Reject
+            </button>
+          </div>
+          {(job.apply_url || job.listing_url) && (
+            <a
+              href={job.apply_url || job.listing_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700"
+            >
+              Apply Now
+            </a>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
