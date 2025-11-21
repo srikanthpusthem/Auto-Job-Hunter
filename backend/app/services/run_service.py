@@ -4,26 +4,28 @@ from backend.app.db.repositories.run_repository import RunRepository
 from backend.app.db.repositories.timeline_repository import TimelineRepository
 from backend.app.db.repositories.scan_history_repository import ScanHistoryRepository
 
+
 class RunService:
     def __init__(self, db):
-        self.run_repo = RunRepository(db)
         self.timeline_repo = TimelineRepository(db)
         self.history_repo = ScanHistoryRepository(db)
 
     async def get_status(self) -> Dict[str, Any]:
         # Check history_repo for running scans
-        last_run = await self.history_repo.collection.find_one({}, sort=[("started_at", -1)])
+        last_run = await self.history_repo.find_one({}, sort=[("started_at", -1)])
         
         status = "idle"
         if last_run and last_run.get("status") == "running":
             started_at = last_run.get("started_at")
             if started_at and (datetime.utcnow() - started_at).total_seconds() > 3600:
-                # Auto-fail stale run
-                await self.history_repo.update(last_run["_id"], {"status": "failed", "error": "Run timed out (stale)"})
+                await self.history_repo.update(
+                    last_run["_id"],
+                    {"status": "failed", "error": "Run timed out (stale)"},
+                )
                 status = "idle"
             else:
                 status = "running"
-        
+
         return {"status": status}
 
     async def start_run(self, user_id: str, sources: List[str] = None) -> str:
@@ -81,11 +83,13 @@ class RunService:
         
         timeline = []
         for log in logs:
-            timeline.append({
-                "step": log.get("step"),
-                "timestamp": log.get("timestamp"),
-                "metadata": log.get("metadata")
-            })
+            timeline.append(
+                {
+                    "step": log.get("step"),
+                    "timestamp": log.get("timestamp"),
+                    "metadata": log.get("metadata"),
+                }
+            )
         return timeline
 
     async def get_last_completed_run(self):
@@ -95,4 +99,4 @@ class RunService:
         # So we probably just want the last system scan?
         # history_repo.get_last_completed_scan requires user_id.
         # I'll modify it to be optional or just find one.
-        return await self.history_repo.collection.find_one({"status": "completed"}, sort=[("started_at", -1)])
+        return await self.history_repo.find_one({"status": "completed"}, sort=[("started_at", -1)])

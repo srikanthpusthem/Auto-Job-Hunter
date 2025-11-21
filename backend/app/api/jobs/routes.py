@@ -39,6 +39,7 @@ async def trigger_scan(
     background_tasks.add_task(
         job_service.run_job_scan,
         user_profile,
+        request.clerk_user_id,
         request.sources,
         request.match_threshold,
         request.keywords,
@@ -75,7 +76,7 @@ async def list_jobs(
     }
     
     jobs = await job_service.list_jobs(filters, limit, sort_by, sort_order)
-    recent_runs = await run_service.run_repo.get_recent_runs(limit=20) 
+    recent_runs = await run_service.get_recent_runs(limit=20)
     
     return {
         "jobs": jobs,
