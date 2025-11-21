@@ -41,7 +41,11 @@ async def match_job(job: Job, user_profile: dict, system_prompt_template: str) -
 
 async def matcher_node(state: AgentState):
     print("--- Matching Agent ---")
+    user_id = state.get("user_id", "unknown")
+    run_id = state.get("run_id")
     normalized_jobs = state.get("normalized_jobs", [])
+    
+    await log_step(user_id, f"Matcher: Scoring {len(normalized_jobs)} jobs...", run_id=run_id)
     user_profile = state.get("user_profile", {})
     run_meta = state.get("run_meta", {})
     threshold = run_meta.get("match_threshold", 0.7)

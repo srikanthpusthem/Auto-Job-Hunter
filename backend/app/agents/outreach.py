@@ -37,7 +37,11 @@ async def generate_outreach(job: Job, user_profile: dict, system_prompt_template
 
 async def outreach_node(state: AgentState):
     print("--- Outreach Agent ---")
+    user_id = state.get("user_id", "unknown")
+    run_id = state.get("run_id")
     matched_jobs = state.get("matched_jobs", [])
+    
+    await log_step(user_id, f"Outreach: Generating messages for {len(matched_jobs)} matches...", run_id=run_id)
     user_profile = state.get("user_profile", {})
     
     # Load prompt

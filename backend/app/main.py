@@ -6,6 +6,8 @@ from backend.app.api.jobs import routes as jobs
 from backend.app.api.dashboard import routes as dashboard
 from backend.app.api.runs import routes as runs
 from backend.app.api.outreach import templates as outreach_templates
+from backend.app.api.agents import timeline as agents_timeline
+from backend.app.api.agents import history as agents_history
 from backend.app.db.mongo import db
 
 app = FastAPI(title="Auto Job Hunter API", version="1.0.0")

@@ -134,6 +134,7 @@ class ScanRun(BaseModel):
     sources: List[str] = []
     jobs_found: int = 0
     jobs_matched: int = 0
+    avg_score: Optional[float] = None
     started_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
     error: Optional[str] = None

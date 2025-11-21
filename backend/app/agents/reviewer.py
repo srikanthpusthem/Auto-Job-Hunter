@@ -5,9 +5,13 @@ from backend.app.agents.graph import AgentState
 from backend.app.agents.llm_client import llm_client
 from backend.app.db.mongo import get_database
 from backend.app.db.repositories.job_repository import JobRepository
+from backend.app.utils.timeline import log_step
 
 async def reviewer_node(state: AgentState):
     print("--- Reviewer Agent ---")
+    user_id = state.get("user_id", "unknown")
+    run_id = state.get("run_id")
+    await log_step(user_id, "Reviewer: Finalizing job list...", run_id=run_id)
     matched_jobs = state.get("matched_jobs", [])
     
     if not matched_jobs:

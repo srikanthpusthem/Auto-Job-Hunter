@@ -1,10 +1,17 @@
+```python
 import json
 import os
 from backend.app.agents.graph import AgentState
 from backend.app.agents.llm_client import llm_client
+from backend.app.utils.timeline import log_step
 
 async def profiler_node(state: AgentState):
     print("--- Resume Profiler Agent ---")
+    user_id = state.get("user_id", "unknown")
+    run_id = state.get("run_id")
+    await log_step(user_id, "Profiler: Analyzing user profile and resume...", run_id=run_id)
+    
+    # Logic to extract skills if not present
     user_profile = state.get("user_profile", {})
     
     # Load prompt

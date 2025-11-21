@@ -11,5 +11,7 @@ class AgentState(TypedDict):
     outreach_payloads: List[Dict[str, Any]]
     errors: List[str]
     run_meta: Dict[str, Any]
+    user_id: str
+    run_id: Optional[str]
 
 workflow = StateGraph(AgentState)
