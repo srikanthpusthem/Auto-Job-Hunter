@@ -6,3 +6,9 @@ __pycache__/
 *.pyc
 # OS files
 .DS_Store
+# Environment variables
+.env
+.env.local
+backend/.env
+backend/.env.local
+frontend/.env.local
