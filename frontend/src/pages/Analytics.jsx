@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/clerk-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { Loader2, RefreshCw } from 'lucide-react'
@@ -13,13 +13,9 @@ export default function Analytics() {
   const [timeline, setTimeline] = useState([])
   const [history, setHistory] = useState([])
 
-  useEffect(() => {
-    if (user?.id) {
-      loadData()
-    }
-  }, [user])
+  const loadData = useCallback(async () => {
+    if (!user?.id) return
 
-  const loadData = async () => {
     try {
       const [timelineData, historyData] = await Promise.all([
         analyticsApi.getTimeline(user.id),
@@ -33,7 +29,11 @@ export default function Analytics() {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleRefresh = () => {
     setRefreshing(true)

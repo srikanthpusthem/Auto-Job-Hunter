@@ -1,12 +1,12 @@
 import { useUser } from '@clerk/clerk-react'
 import { Upload, Save, Loader2, FileText, CheckCircle, X } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { userApi } from '../lib/api'
 import { useProfileStore } from '../store/profileStore'
 
 export default function ProfilePage() {
   const { user } = useUser()
-  const { profile, setProfile } = useProfileStore()
+  const { setProfile } = useProfileStore()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -29,20 +29,13 @@ export default function ProfilePage() {
     salaryCurrency: 'USD',
   })
 
-  // Load profile on mount
-  useEffect(() => {
-    if (user?.id) {
-      loadProfile()
-    }
-  }, [user])
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     if (!user?.id) return
     setLoading(true)
     try {
       const data = await userApi.getProfile(user.id)
       setProfile(data)
-      
+
       if (data.profile) {
         const profileData = data.profile
         setFormData({
@@ -51,7 +44,7 @@ export default function ProfilePage() {
           summary: profileData.summary || '',
           experience: profileData.experience_years?.toString() || '5',
           location: profileData.preferences?.location || 'Remote',
-          remoteOnly: profileData.preferences?.remote_only || true,
+          remoteOnly: profileData.preferences?.remote_only ?? true,
           linkedinUrl: profileData.linkedin_url || '',
           jobTypes: profileData.preferences?.job_types || [],
           employmentTypes: profileData.preferences?.employment_types || [],
@@ -59,17 +52,22 @@ export default function ProfilePage() {
           salaryMax: profileData.preferences?.salary_max?.toString() || '',
           salaryCurrency: profileData.preferences?.salary_currency || 'USD',
         })
-        
+
         if (profileData.resume_file_url) {
           setUploadedFile(profileData.resume_file_url.split('/').pop())
         }
       }
     } catch (error) {
-      console.log('Profile not found, using defaults')
+      console.warn('Profile not found, using defaults', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [setProfile, user?.id])
+
+  // Load profile on mount
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
