@@ -84,8 +84,18 @@ export default function Settings() {
         summary: profile.profile.summary,
         experience_years: profile.profile.experience_years || 0,
         linkedin_url: profile.profile.linkedin_url,
-        location: profile.profile.preferences?.location,
-        ...updatedProfile.preferences
+        preferences: {
+          ...profile.profile.preferences,
+          location: profile.profile.preferences?.location,
+          aggressiveness: settings.aggressiveness,
+          role_focus: settings.role_focus,
+          remote_only: settings.remote_only,
+          exclude_faang: settings.exclude_faang,
+          target_startups: settings.target_startups,
+          salary_min: settings.salary_min ? parseFloat(settings.salary_min) : null,
+          run_schedule: settings.run_schedule,
+          outreach_style: settings.outreach_style,
+        }
       })
 
       setSaved(true)

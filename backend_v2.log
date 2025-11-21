@@ -1,0 +1,16 @@
+INFO:     Started server process [81920]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Connected to MongoDB at mongodb+srv://srikanthpusthem_db_user:UuHO9Vu4crnoOsw0@cluster0.rm5ayac.mongodb.net/?appName=Cluster0
+INFO:     127.0.0.1:63234 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63236 - "POST /api/users/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63247 - "GET /api/users/profile/test_user_123 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63249 - "GET /api/agents/timeline?clerk_user_id=test_user_123 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63251 - "GET /api/agents/history?clerk_user_id=test_user_123 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63253 - "GET /api/outreach/templates?clerk_user_id=test_user_123 HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [81920]
+Closed MongoDB connection

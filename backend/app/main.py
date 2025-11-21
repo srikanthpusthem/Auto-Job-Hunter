@@ -37,6 +37,9 @@ app.include_router(users.router)
 app.include_router(jobs.router)
 app.include_router(dashboard.router)
 app.include_router(runs.router)
+app.include_router(outreach_templates.router)
+app.include_router(agents_timeline.router)
+app.include_router(agents_history.router)
 
 @app.get("/")
 async def root():

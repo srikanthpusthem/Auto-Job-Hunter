@@ -103,3 +103,47 @@ export const dashboardApi = {
     return response.data
   },
 }
+
+// Outreach API
+export const outreachApi = {
+  getTemplates: async (clerkUserId) => {
+    const response = await api.get('/api/outreach/templates', {
+      params: { clerk_user_id: clerkUserId }
+    })
+    return response.data
+  },
+
+  createTemplate: async (templateData) => {
+    const response = await api.post('/api/outreach/templates', templateData)
+    return response.data
+  },
+
+  updateTemplate: async (templateId, templateData) => {
+    const response = await api.put(`/api/outreach/templates/${templateId}`, templateData)
+    return response.data
+  },
+
+  deleteTemplate: async (templateId, clerkUserId) => {
+    const response = await api.delete(`/api/outreach/templates/${templateId}`, {
+      params: { clerk_user_id: clerkUserId }
+    })
+    return response.data
+  },
+}
+
+// Analytics API
+export const analyticsApi = {
+  getTimeline: async (clerkUserId, limit = 50) => {
+    const response = await api.get('/api/agents/timeline', {
+      params: { clerk_user_id: clerkUserId, limit }
+    })
+    return response.data
+  },
+
+  getScanHistory: async (clerkUserId, limit = 20) => {
+    const response = await api.get('/api/agents/history', {
+      params: { clerk_user_id: clerkUserId, limit }
+    })
+    return response.data
+  },
+}

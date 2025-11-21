@@ -1,74 +1,156 @@
-import { Mail, MessageSquare, Send, Copy } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useUser } from '@clerk/clerk-react'
+import { Plus, Loader2, MessageSquare, Sparkles } from 'lucide-react'
+import { outreachApi } from '../lib/api'
+import TemplateList from '../components/outreach/TemplateList'
+import TemplateEditor from '../components/outreach/TemplateEditor'
 
 export default function Outreach() {
+  const { user } = useUser()
+  const [loading, setLoading] = useState(true)
+  const [templates, setTemplates] = useState([])
+  const [isEditing, setIsEditing] = useState(false)
+  const [currentTemplate, setCurrentTemplate] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (user?.id) {
+      loadTemplates()
+    }
+  }, [user])
+
+  const loadTemplates = async () => {
+    try {
+      const data = await outreachApi.getTemplates(user.id)
+      setTemplates(data)
+    } catch (error) {
+      console.error('Error loading templates:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreate = () => {
+    setCurrentTemplate(null)
+    setIsEditing(true)
+  }
+
+  const handleEdit = (template) => {
+    setCurrentTemplate(template)
+    setIsEditing(true)
+  }
+
+  const handleDelete = async (templateId) => {
+    if (!window.confirm('Are you sure you want to delete this template?')) return
+
+    try {
+      await outreachApi.deleteTemplate(templateId, user.id)
+      setTemplates(prev => prev.filter(t => t._id !== templateId))
+    } catch (error) {
+      console.error('Error deleting template:', error)
+      alert('Failed to delete template')
+    }
+  }
+
+  const handleSave = async (formData) => {
+    setSaving(true)
+    try {
+      if (currentTemplate) {
+        // Update
+        const updated = await outreachApi.updateTemplate(currentTemplate._id, {
+          ...formData,
+          clerk_user_id: user.id
+        })
+        setTemplates(prev => prev.map(t => t._id === updated._id ? updated : t))
+      } else {
+        // Create
+        const created = await outreachApi.createTemplate({
+          ...formData,
+          clerk_user_id: user.id
+        })
+        setTemplates(prev => [created, ...prev])
+      }
+      setIsEditing(false)
+      setCurrentTemplate(null)
+    } catch (error) {
+      console.error('Error saving template:', error)
+      alert('Failed to save template')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Outreach Center</h1>
-        <p className="text-gray-600 mt-1">Manage your communication templates and strategy</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Outreach Center</h1>
+          <p className="text-gray-600 mt-1">Manage your message templates and personalization</p>
+        </div>
+        {!isEditing && (
+          <button
+            onClick={handleCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            New Template
+          </button>
+        )}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Templates List */}
-        <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <h3 className="font-semibold text-gray-900 mb-4 px-2">Templates</h3>
-          <div className="space-y-2">
-            <button className="w-full text-left px-4 py-3 bg-blue-50 text-blue-700 rounded-lg font-medium flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Cold Email - Standard
-            </button>
-            <button className="w-full text-left px-4 py-3 hover:bg-gray-50 text-gray-700 rounded-lg font-medium flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
-              LinkedIn Connection
-            </button>
-            <button className="w-full text-left px-4 py-3 hover:bg-gray-50 text-gray-700 rounded-lg font-medium flex items-center gap-2">
-              <Send className="w-4 h-4" />
-              Follow-up (3 Days)
-            </button>
-          </div>
-        </div>
-
-        {/* Editor */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Template Name</label>
-            <input 
-              type="text" 
-              defaultValue="Cold Email - Standard"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+      {/* Stats / Info Cards */}
+      {!isEditing && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <h3 className="font-semibold text-gray-900">Total Templates</h3>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{templates.length}</p>
           </div>
           
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Subject Line</label>
-            <input 
-              type="text" 
-              defaultValue="Regarding {job_title} role at {company}"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
-            <textarea 
-              rows={10}
-              defaultValue="Hi {hiring_manager},&#10;&#10;I noticed you're looking for a {job_title}..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-            />
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium">
-              <Copy className="w-4 h-4" />
-              Duplicate
-            </button>
-            <button className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">
-              Save Changes
-            </button>
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-100">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <h3 className="font-semibold text-gray-900">AI Personalization</h3>
+            </div>
+            <p className="text-sm text-gray-600">
+              Templates use AI to automatically fill in details like company name, hiring manager, and relevant skills.
+            </p>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Main Content */}
+      {isEditing ? (
+        <TemplateEditor
+          template={currentTemplate}
+          onSave={handleSave}
+          onCancel={() => {
+            setIsEditing(false)
+            setCurrentTemplate(null)
+          }}
+          saving={saving}
+        />
+      ) : (
+        <TemplateList
+          templates={templates}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   )
 }
-

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from backend.app.db.mongo import get_database
 from backend.app.services.user_service import UserService
 
@@ -20,7 +20,12 @@ async def create_or_update_profile(
     
     if existing_user:
         # Update
-        await user_service.update_profile(existing_user["_id"], profile_data.get("profile", {}))
+        # Remove user-level fields from profile data
+        profile_update = profile_data.copy()
+        profile_update.pop("clerk_user_id", None)
+        profile_update.pop("email", None)
+        
+        await user_service.update_profile(existing_user["_id"], profile_update)
         return {"message": "Profile updated", "user_id": existing_user["_id"]}
     else:
         # Create
@@ -37,3 +42,31 @@ async def get_profile(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+@router.post("/resume")
+async def upload_resume(
+    clerk_user_id: str,
+    file: UploadFile = File(...),
+    db = Depends(get_database)
+):
+    user_service = UserService(db)
+    
+    # Read file content
+    content = await file.read()
+    
+    try:
+        result = await user_service.parse_resume(content, file.filename)
+        
+        # If successful, we might want to save the file URL or text to the profile immediately
+        # But for now, we just return the extracted data so the frontend can populate the form
+        # and the user can review before saving.
+        
+        # Optionally update profile with raw text or file metadata if needed
+        # await user_service.update_resume_metadata(clerk_user_id, ...)
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Resume upload error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during resume parsing")
